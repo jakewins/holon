@@ -28,6 +28,9 @@ public class HolonClassLoader extends ClassLoader
 
     public void define( String className, byte[] byteCodes )
     {
-        defineClass( className, byteCodes, 0, byteCodes.length );
+        if(findLoadedClass( className ) == null)
+        {
+            defineClass( className, byteCodes, 0, byteCodes.length );
+        }
     }
 }

@@ -19,6 +19,85 @@
  */
 package holon.internal.http.common;
 
-public class StandardCookie
+import java.util.Date;
+
+import holon.api.http.Cookie;
+
+public class StandardCookie implements Cookie
 {
+    private String name;
+    private String value;
+    private String domain;
+    private String path;
+    private int maxAge;
+    private boolean secure = false;
+    private boolean httpOnly = false;
+
+    public StandardCookie( String name, String value, String domain, String path, Date expiryDate )
+    {
+        this.name = name;
+        this.value = value;
+        this.domain = domain;
+        this.path = path;
+    }
+
+    public StandardCookie( String name, String value, String domain, String path, int maxAge, boolean secure,
+                           boolean httpOnly )
+    {
+        this.name = name;
+        this.value = value;
+        this.domain = domain;
+        this.path = path;
+        this.maxAge = maxAge;
+        this.secure = secure;
+        this.httpOnly = httpOnly;
+    }
+
+    public StandardCookie( String name, String value )
+    {
+        this.name = name;
+        this.value = value;
+    }
+
+    @Override
+    public String value()
+    {
+        return value;
+    }
+
+    @Override
+    public String name()
+    {
+        return name;
+    }
+
+    @Override
+    public String path()
+    {
+        return path;
+    }
+
+    @Override
+    public String domain()
+    {
+        return domain;
+    }
+
+    @Override
+    public int maxAge()
+    {
+        return maxAge;
+    }
+
+    @Override
+    public boolean secure()
+    {
+        return secure;
+    }
+
+    @Override
+    public boolean httpOnly()
+    {
+        return httpOnly;
+    }
 }

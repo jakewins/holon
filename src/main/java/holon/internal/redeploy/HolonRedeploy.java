@@ -24,7 +24,7 @@ import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 
 import holon.Holon;
-import holon.api.Bootstrap;
+import holon.api.Application;
 import holon.api.config.Config;
 import holon.internal.HolonFactory;
 import holon.internal.redeploy.compile.RuntimeCompiler;
@@ -50,7 +50,7 @@ import static holon.util.io.FileTools.findFiles;
  */
 public class HolonRedeploy
 {
-    private final Class<? extends Bootstrap> bootstrapClass;
+    private final Class<? extends Application> bootstrapClass;
     private final Config config;
     private final File appFiles;
     private final RuntimeCompiler compiler;
@@ -58,8 +58,9 @@ public class HolonRedeploy
     private volatile boolean redeployNeeded = true; // Set when files change
     private Holon holon;
     private HolonClassLoader classLoader;
+    private Application application;
 
-    public HolonRedeploy( Class<? extends Bootstrap> bootstrapClass, Config config, File appFiles )
+    public HolonRedeploy( Class<? extends Application> bootstrapClass, Config config, File appFiles )
     {
         this.bootstrapClass = bootstrapClass;
         this.config = config;
@@ -79,27 +80,29 @@ public class HolonRedeploy
         {
             while(!Thread.interrupted())
             {
-                redeployNeeded = false;
-
-                recompile();
-
-                stopHolon();
-
-                startHolon();
-
-                while(!redeployNeeded)
+                try
                 {
-                    Thread.sleep( 10 );
+                    while(!redeployNeeded)
+                    {
+                        Thread.sleep( 10 );
+                    }
+                    redeployNeeded = false;
+
+                    recompile();
+
+                    stopHolon();
+
+                    startHolon();
+
+                } catch(Exception e)
+                {
+                    if(Thread.interrupted())
+                    {
+                        return;
+                    }
+                    e.printStackTrace();
                 }
             }
-        }
-        catch ( ClassNotFoundException | InstantiationException | IllegalAccessException e )
-        {
-            e.printStackTrace(); // TODO
-        }
-        catch ( InterruptedException e )
-        {
-            // Just exit
         }
         finally
         {
@@ -120,15 +123,27 @@ public class HolonRedeploy
         {
             holon.stop();
         }
+
+        if(application != null)
+        {
+            application.shutdown();
+        }
     }
 
-    private void startHolon() throws ClassNotFoundException, InstantiationException,
-            IllegalAccessException
+    private void startHolon() throws Exception
     {
-        Class<? extends Bootstrap> aClass = (Class<? extends Bootstrap>) classLoader.loadClass( bootstrapClass
-        .getCanonicalName() );
-        holon = new HolonFactory().newHolon( config, aClass.newInstance().bootstrap().toArray() );
-        holon.start();
+        Class<? extends Application> aClass = (Class<? extends Application>)
+                classLoader.loadClass( bootstrapClass.getCanonicalName() );
+        application = aClass.newInstance();
+        holon = new HolonFactory().newHolon( config, application.startup( config ).toArray() );
+        try
+        {
+            holon.start();
+        } catch(Exception e)
+        {
+            holon = null;
+            throw e;
+        }
     }
 
     private void startBackgroundFileSystemWatcher()

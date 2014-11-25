@@ -33,7 +33,14 @@ public class FileRepository implements FileSystemWatcher.FSEventHandler
         {
             throw new HolonException( "Failed to close static file.", e );
         }
-    });;
+    });
+
+    /**
+     * File events come from a separate thread, and the openFiles map is owned by the thread that created this
+     * file repo, meaning the event thread is not allowed to manipulate it. Instead, it signals through this boolean
+     * that files have changed on disk.
+     */
+    private volatile boolean filesHaveChangedOnDisk = false;
 
     public FileRepository( Path basePath, FileSystem fs, Scheduler scheduler )
     {
@@ -56,6 +63,11 @@ public class FileRepository implements FileSystemWatcher.FSEventHandler
 
     public Content get( String path )
     {
+        if(filesHaveChangedOnDisk)
+        {
+            openFiles.clear();
+        }
+
         FileContent content = openFiles.get( path );
         if( content == null )
         {
@@ -81,6 +93,6 @@ public class FileRepository implements FileSystemWatcher.FSEventHandler
     @Override
     public void onFileEvent( WatchEvent.Kind kind, Path path )
     {
-        openFiles.remove( "/" + path.toString() );
+        filesHaveChangedOnDisk = true;
     }
 }

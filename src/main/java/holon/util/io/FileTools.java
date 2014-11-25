@@ -51,4 +51,21 @@ public class FileTools
             }
         }
     }
+
+    public static void deleteRecursively( File folder )
+    {
+        for ( File file : folder.listFiles() )
+        {
+            if(file.isDirectory())
+            {
+                deleteRecursively( file );
+                file.delete();
+            }
+            else
+            {
+                file.delete();
+            }
+        }
+
+    }
 }

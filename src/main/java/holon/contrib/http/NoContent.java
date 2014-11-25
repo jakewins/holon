@@ -19,6 +19,16 @@
  */
 package holon.contrib.http;
 
-public class NoContent
+import java.io.IOException;
+
+import holon.api.http.Content;
+import holon.api.http.Output;
+
+public class NoContent implements Content
 {
+    @Override
+    public void render( Output out, Object context ) throws IOException
+    {
+
+    }
 }

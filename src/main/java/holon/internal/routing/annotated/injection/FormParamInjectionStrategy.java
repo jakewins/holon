@@ -6,10 +6,10 @@ import java.util.Map;
 
 import holon.api.exception.HolonException;
 import holon.api.http.FormParam;
-import holon.api.http.Request;
 import holon.api.http.UploadedFile;
 import holon.api.middleware.Pipeline;
 import holon.internal.routing.annotated.ArgInjectionStrategy;
+import holon.spi.RequestContext;
 
 public class FormParamInjectionStrategy implements ArgInjectionStrategy
 {
@@ -35,7 +35,9 @@ public class FormParamInjectionStrategy implements ArgInjectionStrategy
         {
             if(annotation instanceof FormParam )
             {
-                final String attribute = ((FormParam)annotation).value();
+                FormParam formParam = (FormParam) annotation;
+                final String attribute = formParam.value();
+                final String defaultVal = formParam.defaultVal().length() == 0 ? null : formParam.defaultVal();
                 if(!attribute.equals( "" ))
                 {
                     if(type == String.class || type == UploadedFile.class)
@@ -43,11 +45,15 @@ public class FormParamInjectionStrategy implements ArgInjectionStrategy
                         return new ArgumentInjector(position)
                         {
                             @Override
-                            public Object generateArgument( Request ctx, Pipeline pipeline ) throws IOException
+                            public Object generateArgument( RequestContext ctx, Pipeline pipeline ) throws IOException
                             {
                                 Object o = ctx.formData().get( attribute );
                                 if(o == null)
                                 {
+                                    if(defaultVal != null)
+                                    {
+                                        return defaultVal;
+                                    }
                                     throw new HolonException( "Missing required post parameter '" + attribute + "'" );
                                 }
                                 return o;
@@ -69,7 +75,7 @@ public class FormParamInjectionStrategy implements ArgInjectionStrategy
         return new ArgumentInjector(position)
         {
             @Override
-            public Object generateArgument( Request ctx, Pipeline pipeline ) throws IOException
+            public Object generateArgument( RequestContext ctx, Pipeline pipeline ) throws IOException
             {
                 return ctx.formData();
             }

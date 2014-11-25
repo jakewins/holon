@@ -19,30 +19,78 @@
  */
 package holon.internal;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Supplier;
+
 import holon.Holon;
 import holon.api.config.Config;
 import holon.api.logging.Logging;
+import holon.contrib.session.Sessions;
 import holon.contrib.template.mustache.MustacheTemplateEngine;
 import holon.internal.di.Components;
-import holon.internal.http.netty.Netty5Engine;
+import holon.internal.http.common.StaticContentRoute;
+import holon.internal.http.undertow.UndertowEngine;
 import holon.internal.logging.printstream.PrintStreamLogging;
+import holon.internal.routing.discovery.ExplicitClassRouteDiscovery;
+import holon.internal.routing.discovery.PackageScanRouteDiscovery;
+import holon.internal.routing.discovery.RouteDiscoveryStrategy;
+import holon.spi.Route;
+import holon.util.scheduling.Scheduler;
+import holon.util.scheduling.StandardScheduler;
+
+import static holon.Holon.Configuration.endpoint_packages;
+import static holon.Holon.Configuration.middleware;
 
 public class HolonFactory
 {
+    /** Create a Holon instance using routes discovered based on the configuration passed in. */
+    public Holon newHolon( Config config, Object[] injectables )
+    {
+        Components components = createInjectableComponents( config, injectables );
+        return newHolon( config, new PackageScanRouteDiscovery( components, config.get( endpoint_packages ), config.get( middleware )));
+    }
 
-    public Holon newHolon(Config config, Object[] injectables)
+    /** Create a Holon instance using routes from explicit endpoint classes. */
+    public Holon newHolon( Config config, Object[] injectables, Class[] endpointClasses )
+    {
+        Components components = createInjectableComponents( config, injectables );
+        return newHolon( config, new ExplicitClassRouteDiscovery( "", components, endpointClasses, config.get( middleware )));
+    }
+
+    /** Create a Holon instance using a custom route discovery strategy. */
+    public Holon newHolon( Config config, RouteDiscoveryStrategy routeStrategy )
     {
         Logging logging = new PrintStreamLogging( System.out );
+        Scheduler scheduler = new StandardScheduler();
+        Supplier<Iterable<Route>> routes = loadRoutes( config, scheduler, routeStrategy );
+        return new Holon( new UndertowEngine(config, logging.logger( "holon.engine" )), config, logging, routes );
+    }
 
+    private Components createInjectableComponents( Config config, Object[] injectables )
+    {
         Components components = new Components();
+        components.register( config );
+
+        // TODO: These two should get loaded via some sort of plugin mechanism
         components.register( new MustacheTemplateEngine( config ) );
+        components.register( new Sessions() );
 
         for ( Object injectable : injectables )
         {
             components.register( injectable );
         }
+        return components;
+    }
 
-        return new Holon( new Netty5Engine(config, logging.logger( "engine" )), components, config, logging );
+    private Supplier<Iterable<Route>> loadRoutes( Config config, Scheduler scheduler, RouteDiscoveryStrategy routeStrategy )
+    {
+        return () -> {
+            List<Route> routes = new ArrayList<>();
+            routeStrategy.loadRoutes().forEach( routes::add );
+            routes.add( new StaticContentRoute( config.get( Holon.Configuration.static_path ), scheduler ) );
+            return routes;
+        };
     }
 
 }

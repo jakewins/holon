@@ -16,14 +16,18 @@ public class Components
 
     public <T> Components register( T component )
     {
-        Class<?> cls = component.getClass();
-        asList( cls.getInterfaces() ).forEach( (i) -> register(i, component) );
-        return register( cls, component );
+        return register( component.getClass(), component );
     }
 
-    public <T> Components register( Class<? extends T> cls, T template )
+    private <T> Components register( Class<? extends T> cls, T component )
     {
-        registry.put( cls, template );
+        asList( cls.getInterfaces() ).forEach( ( i ) -> register( i, component ) );
+        if(cls.getSuperclass() != null) register( cls.getSuperclass(), component );
+
+        if(!cls.equals(Object.class))
+        {
+            registry.put( cls, component );
+        }
         return this;
     }
 

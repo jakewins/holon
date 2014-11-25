@@ -19,6 +19,38 @@
  */
 package holon.internal.routing.discovery;
 
-public class ExplicitClassRouteDiscovery
+import java.util.ArrayList;
+import java.util.List;
+
+import holon.internal.di.Components;
+import holon.internal.routing.annotated.RouteCompiler;
+import holon.internal.routing.annotated.RouteScanner;
+import holon.spi.Route;
+
+public class ExplicitClassRouteDiscovery implements RouteDiscoveryStrategy
 {
+    private final String basePath;
+    private final Components components;
+    private final Class[] endpointClasses;
+    private final List<Class<?>> globalMiddlewareClasses;
+
+    public ExplicitClassRouteDiscovery(String basePath, Components components, Class[] endpointClasses, List<Class<?>> globalMiddlewareClasses )
+    {
+        this.basePath = basePath;
+        this.components = components;
+        this.endpointClasses = endpointClasses;
+        this.globalMiddlewareClasses = globalMiddlewareClasses;
+    }
+
+    @Override
+    public Iterable<Route> loadRoutes()
+    {
+        List<Route> routes = new ArrayList<>();
+        RouteScanner routeScanner = new RouteScanner( new RouteCompiler( components, globalMiddlewareClasses ) );
+        for ( Class endpointClass : endpointClasses )
+        {
+            routeScanner.scan( basePath, endpointClass, routes::add );
+        }
+        return routes;
+    }
 }

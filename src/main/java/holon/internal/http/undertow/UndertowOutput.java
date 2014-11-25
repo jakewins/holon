@@ -19,6 +19,38 @@
  */
 package holon.internal.http.undertow;
 
-public class UndertowOutput
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.Charset;
+
+import holon.api.http.Output;
+import io.undertow.server.HttpServerExchange;
+import org.xnio.channels.StreamSinkChannel;
+
+public class UndertowOutput implements Output
 {
+    private final Charset UTF_8 = Charset.forName( "UTF-8" );
+    private HttpServerExchange exchange;
+
+    public UndertowOutput initialize( HttpServerExchange exchange )
+    {
+        this.exchange = exchange;
+        return this;
+    }
+
+    @Override
+    public Writer asWriter()
+    {
+        exchange.startBlocking();
+        return new OutputStreamWriter( exchange.getOutputStream(), UTF_8 );
+    }
+
+    @Override
+    public void write( FileChannel channel ) throws IOException
+    {
+        StreamSinkChannel responseChannel = exchange.getResponseChannel();
+        responseChannel.transferFrom( channel, 0, channel.size() );
+    }
 }

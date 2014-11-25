@@ -19,6 +19,15 @@
  */
 package holon.api.http;
 
-public class PathParam
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
+/**
+ * A parameter from the request path - or the full request path, excluding query parameters,
+ * if no parameter name is specified.
+ */
+@Retention(RetentionPolicy.RUNTIME )
+public @interface PathParam
 {
+    String value() default "";
 }

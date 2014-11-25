@@ -8,7 +8,9 @@ public interface Status
     {
         OK( 200 ),
         SEE_OTHER( 303 ),
-        NOT_FOUND( 404 );
+        UNAUTHORIZED( 401 ),
+        NOT_FOUND( 404 ),
+        SERVER_ERROR( 500 );
 
         private final int code;
 

@@ -23,18 +23,18 @@ import java.io.IOException;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import holon.api.http.Content;
 import holon.api.http.Output;
-import holon.internal.http.common.BaseContent;
 
 /**
  * Content that renders JSON structures.
  */
-public class JsonContent extends BaseContent
+public class JsonContent implements Content
 {
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Override
-    public void render( Output out ) throws IOException
+    public void render( Output out, Object context ) throws IOException
     {
         JsonGenerator generator = mapper.getFactory().createGenerator( out.asWriter() );
         generator.writeObject( context );
@@ -42,7 +42,7 @@ public class JsonContent extends BaseContent
     }
 
     @Override
-    protected String defaultContentType()
+    public String contentType(Object ctx)
     {
         return "application/json";
     }

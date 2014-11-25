@@ -19,6 +19,21 @@
  */
 package holon.internal.config;
 
+import holon.api.config.Config;
+import holon.api.config.Setting;
+
 public class ConfigBuilder
 {
+    private final MapConfig config = new MapConfig();
+
+    public ConfigBuilder set( Setting<?> setting, Object value )
+    {
+        config.set( setting, value );
+        return this;
+    }
+
+    public Config build()
+    {
+        return config;
+    }
 }

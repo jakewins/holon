@@ -1,12 +1,15 @@
 package holon.internal.http.common;
 
+import java.io.IOException;
 import java.nio.file.FileSystem;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
+import holon.api.exception.HolonException;
 import holon.api.http.Content;
-import holon.api.http.Request;
 import holon.api.http.Status;
 import holon.internal.http.common.files.FileRepository;
+import holon.spi.RequestContext;
 import holon.spi.Route;
 import holon.util.scheduling.Scheduler;
 
@@ -19,7 +22,23 @@ public class StaticContentRoute implements Route
     public StaticContentRoute( Path staticContentFolder, Scheduler scheduler )
     {
         FileSystem fs = staticContentFolder.getFileSystem();
+        ensurePublicDirExists( staticContentFolder );
         files = new FileRepository( staticContentFolder, fs, scheduler );
+    }
+
+    private void ensurePublicDirExists( Path staticContentFolder )
+    {
+        if(!Files.exists( staticContentFolder ))
+        {
+            try
+            {
+                Files.createDirectories( staticContentFolder );
+            }
+            catch ( IOException e )
+            {
+                throw new HolonException( "Failed to create public directory at " + staticContentFolder.toString() );
+            }
+        }
     }
 
     @Override
@@ -54,13 +73,12 @@ public class StaticContentRoute implements Route
     }
 
     @Override
-    public void call( Request req )
+    public void call( RequestContext req )
     {
-        Content file = files.get( req.path() );
-
+        Content file = files.get( req.path().fullPath() );
         if(file != null)
         {
-            req.respond( Status.Code.OK, file, null );
+            req.respond( Status.Code.OK, file );
         }
         else
         {

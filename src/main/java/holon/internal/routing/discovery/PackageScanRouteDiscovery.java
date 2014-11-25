@@ -19,6 +19,35 @@
  */
 package holon.internal.routing.discovery;
 
-public class PackageScanRouteDiscovery
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import holon.internal.di.Components;
+import holon.internal.routing.annotated.RouteCompiler;
+import holon.internal.routing.annotated.RouteScanner;
+import holon.spi.Route;
+
+/** Finds routes by scanning a package recursively for annotated classes. */
+public class PackageScanRouteDiscovery implements RouteDiscoveryStrategy
 {
+    private final Components components;
+    private final Map<String, String> routePathToPackageMapping;
+    private final List<Class<?>> globalMiddleware;
+
+    public PackageScanRouteDiscovery(Components components, Map<String,String> routePathToPackageMapping, List<Class<?>> globalMiddleware )
+    {
+        this.components = components;
+        this.routePathToPackageMapping = routePathToPackageMapping;
+        this.globalMiddleware = globalMiddleware;
+    }
+
+    @Override
+    public Iterable<Route> loadRoutes()
+    {
+        List<Route> routes = new ArrayList<>();
+        RouteScanner routeScanner = new RouteScanner( new RouteCompiler( components, globalMiddleware ) );
+        routePathToPackageMapping.forEach( ( path, pkg ) -> routeScanner.scan( path, pkg, routes::add ) );
+        return routes;
+    }
 }

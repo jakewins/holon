@@ -8,7 +8,7 @@ import java.util.Map;
 
 import holon.api.config.Config;
 import holon.api.config.Setting;
-import holon.internal.http.netty.Netty5Engine;
+import holon.spi.HolonEngine;
 import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
 import org.junit.Test;
@@ -35,7 +35,7 @@ public class JsonConfigTest
 
         public static Setting<String> string =
                 setting( "application.http_engine", string(),
-                        defaultValue( Netty5Engine.class.getCanonicalName() ));
+                        defaultValue( HolonEngine.class.getCanonicalName() ));
     }
 
     @Test

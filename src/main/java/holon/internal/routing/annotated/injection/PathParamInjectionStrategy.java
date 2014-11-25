@@ -19,6 +19,78 @@
  */
 package holon.internal.routing.annotated.injection;
 
-public class PathParamInjectionStrategy
+import java.io.IOException;
+import java.lang.annotation.Annotation;
+
+import holon.api.exception.HolonException;
+import holon.api.http.PathParam;
+import holon.api.middleware.Pipeline;
+import holon.internal.routing.annotated.ArgInjectionStrategy;
+import holon.spi.RequestContext;
+
+public class PathParamInjectionStrategy implements ArgInjectionStrategy
 {
+    @Override
+    public boolean appliesTo( Class<?> type, Annotation[] annotations )
+    {
+        for ( Annotation annotation : annotations )
+        {
+            if(annotation instanceof PathParam )
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public ArgInjectionStrategy.ArgumentInjector satisfyArgument( Object[] args, int position, Class<?> type, Annotation[] annotations )
+    {
+        // First, check if the annotation specifies a specific attribute to use, and if it does, set things up
+        // to inject the value of that attribute directly
+        for ( Annotation annotation : annotations )
+        {
+            if(annotation instanceof PathParam )
+            {
+                final String attribute = ((PathParam)annotation).value();
+                if(!attribute.equals( "" ))
+                {
+                    if(type == String.class)
+                    {
+                        return new ArgInjectionStrategy.ArgumentInjector(position)
+                        {
+                            @Override
+                            public Object generateArgument( RequestContext ctx, Pipeline pipeline ) throws IOException
+                            {
+                                String o = ctx.path().param( attribute );
+                                if(o == null)
+                                {
+                                    throw new HolonException( "Missing required path parameter '" + attribute + "'" );
+                                }
+                                return o;
+                            }
+                        };
+                    }
+
+                    throw new IllegalArgumentException( "PathParam attribute needs to be a string, but was " + type + "." );
+                }
+            }
+        }
+
+        // If a specific attribute was not asked for, the user should get the full attribute map
+        if(type != String.class)
+        {
+            throw new IllegalArgumentException( "PathParam attribute needs to be a String, but was " + type + "." );
+        }
+
+        return new ArgInjectionStrategy.ArgumentInjector(position)
+        {
+            @Override
+            public Object generateArgument( RequestContext ctx, Pipeline pipeline ) throws IOException
+            {
+                return ctx.path().fullPath();
+            }
+        };
+    }
+
 }

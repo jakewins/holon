@@ -1,13 +1,6 @@
 package holon;
 
-import java.io.File;
-import java.net.MalformedURLException;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
-import holon.api.Bootstrap;
+import holon.api.Application;
 import holon.api.config.Config;
 import holon.api.config.Setting;
 import holon.api.exception.HolonException;
@@ -15,20 +8,25 @@ import holon.api.logging.Logging;
 import holon.internal.HolonFactory;
 import holon.internal.HolonFiles;
 import holon.internal.config.JsonConfigParser;
-import holon.internal.di.Components;
-import holon.internal.http.common.StaticContentRoute;
-import holon.internal.http.netty.Netty5Engine;
 import holon.internal.redeploy.HolonRedeploy;
-import holon.internal.routing.annotated.RouteCompiler;
-import holon.internal.routing.annotated.RouteScanner;
 import holon.spi.HolonEngine;
 import holon.spi.Route;
-import holon.util.scheduling.StandardScheduler;
+
+import java.io.File;
+import java.net.MalformedURLException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Supplier;
 
 import static holon.api.config.Setting.NO_DEFAULT;
 import static holon.api.config.Setting.defaultValue;
 import static holon.api.config.Setting.setting;
 import static holon.api.config.SettingConverters.bool;
+import static holon.api.config.SettingConverters.clazz;
+import static holon.api.config.SettingConverters.integer;
+import static holon.api.config.SettingConverters.listOf;
 import static holon.api.config.SettingConverters.mapOf;
 import static holon.api.config.SettingConverters.path;
 import static holon.api.config.SettingConverters.string;
@@ -40,7 +38,7 @@ public class Holon
     public static class Configuration
     {
         public static Setting<String> app_name =
-                setting( "application.name", string(), NO_DEFAULT );
+                setting( "application.name", string(), defaultValue( "holon" ) );
 
         public static Setting<Path> config_path =
                 setting( "application.config_path", path(), NO_DEFAULT);
@@ -51,36 +49,36 @@ public class Holon
         public static Setting<Map<String, String>> endpoint_packages =
                 setting( "application.endpoints", mapOf( string() ), HolonFiles::defaultEndpointPackages );
 
+        public static Setting<List<Class<?>>> middleware =
+                setting( "application.middleware", listOf( clazz() ), defaultValue( new ArrayList<>() ) );
+
         public static Setting<Path> template_path =
                 setting( "application.template_path", path(), HolonFiles::defaultTemplatePath );
 
         public static Setting<Path> static_path =
                 setting( "application.public_files", path(), HolonFiles::defaultStaticPath );
 
-        public static Setting<String> http_engine =
-                setting( "application.http_engine", string(),
-                         defaultValue( Netty5Engine.class.getCanonicalName() ));
+        public static final Setting<Integer> http_port =
+                setting( "application.http.port", integer(), defaultValue( "8080" ) );
 
         public static Setting<Boolean> auto_redeploy =
                 setting( "application.auto_redeploy", bool(), defaultValue( "true" ) );
     }
 
-    private final Components components;
     private final HolonEngine http;
     private final Config config;
     private final Logging logging;
-    private final StandardScheduler scheduler;
+    private final Supplier<Iterable<Route>> routes;
 
-    public Holon( HolonEngine http, Components components, Config config, Logging logging )
+    public Holon( HolonEngine http, Config config, Logging logging, Supplier<Iterable<Route>> routes )
     {
         this.http = http;
         this.config = config;
         this.logging = logging;
-        this.components = components;
-        this.scheduler = new StandardScheduler();
+        this.routes = routes;
     }
 
-    public static void run( Class<? extends Bootstrap> bootstrapClass )
+    public static void run( Class<? extends Application> bootstrapClass )
     {
         Config config = createConfiguration();
 
@@ -91,14 +89,23 @@ public class Holon
         }
         else
         {
+            Application application = null;
             try
             {
-                run(bootstrapClass.newInstance().bootstrap());
+                application = bootstrapClass.newInstance();
+                run( application.startup( config ).toArray() );
             }
-            catch ( InstantiationException |  IllegalAccessException e )
+            catch ( Exception e )
             {
                 throw new HolonException( "Unable to launch Holon, failed to instantiate bootstrap class. " +
                         "Make sure your bootstrap class has a public no-arg constructor.", e);
+            }
+            finally
+            {
+                if(application != null)
+                {
+                    application.shutdown();
+                }
             }
         }
     }
@@ -119,7 +126,7 @@ public class Holon
     {
         logging.logger( "main" ).info( String.format("Launching '%s' [%s]!",
                 config.get(Configuration.app_name), config.get(Configuration.home_dir ) ) );
-        http.serve( loadRoutes() );
+        http.serve( routes );
     }
 
     public void join()
@@ -130,6 +137,11 @@ public class Holon
     public void stop()
     {
         http.shutdown();
+    }
+
+    public String httpUrl()
+    {
+        return "http://localhost:" + config.get( Configuration.http_port ); // TODO
     }
 
     private static Config createConfiguration()
@@ -145,15 +157,5 @@ public class Holon
         {
             throw new HolonException( "Unable to launch Holon, failed to set up directory and config paths.", e);
         }
-    }
-
-    private List<Route> loadRoutes()
-    {
-        List<Route> routes = new ArrayList<>();
-        RouteScanner routeScanner = new RouteScanner( new RouteCompiler( components ) );
-        config.get( Configuration.endpoint_packages ).forEach( ( path, pkg ) ->
-                routeScanner.scan( path, pkg, routes::add) );
-        routes.add( new StaticContentRoute(config.get( Configuration.static_path ), scheduler) );
-        return routes;
     }
 }

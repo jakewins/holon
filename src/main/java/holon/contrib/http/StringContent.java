@@ -19,6 +19,44 @@
  */
 package holon.contrib.http;
 
-public class StringContent
+import java.io.IOException;
+import java.io.Writer;
+
+import holon.api.http.Content;
+import holon.api.http.Output;
+
+public class StringContent implements Content
 {
+    private final String value;
+
+    public StringContent( String value )
+    {
+        this.value = value;
+    }
+
+    @Override
+    public String contentType(Object ctx)
+    {
+        return "text/plain";
+    }
+
+    @Override
+    public void render( Output out, Object context ) throws IOException
+    {
+        Writer writer = out.asWriter();
+        try
+        {
+            if ( context != null && context instanceof String )
+            {
+                writer.append( (String) context );
+            }
+            else
+            {
+                writer.append( value );
+            }
+        } finally
+        {
+            writer.flush();
+        }
+    }
 }

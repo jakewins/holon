@@ -19,6 +19,8 @@
  */
 package holon.internal.routing.path;
 
-public class PathPattern
+public interface Path
 {
+    String param(String key);
+    String fullPath();
 }

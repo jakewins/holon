@@ -17,8 +17,17 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package holon.internal.routing;
+package holon.util.collection;
 
-public class Path
+import java.util.ArrayList;
+import java.util.List;
+
+public class Iterables
 {
+    public static <T> List<T> toList( Iterable<T> iterable )
+    {
+        ArrayList<T> ts = new ArrayList<>();
+        iterable.forEach( ts::add );
+        return ts;
+    }
 }

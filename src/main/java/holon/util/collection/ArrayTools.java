@@ -19,6 +19,54 @@
  */
 package holon.util.collection;
 
+import java.lang.reflect.Array;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Function;
+
 public class ArrayTools
 {
+    public static <T> T[] concat (T[] first, T[] second)
+    {
+        @SuppressWarnings("unchecked")
+        T[] C = (T[]) Array.newInstance( first.getClass().getComponentType(), first.length + second.length );
+        System.arraycopy(first, 0, C, 0, first.length );
+        System.arraycopy(second, 0, C, first.length, second.length );
+
+        return C;
+    }
+
+    public static <T> T[] reverse(T[] input)
+    {
+        for(int i = 0; i < input.length / 2; i++)
+        {
+            T temp = input[i];
+            input[i] = input[input.length - i - 1];
+            input[input.length - i - 1] = temp;
+        }
+        return input;
+    }
+
+    public static <T> List<T> reverse(List<T> input)
+    {
+        for(int i = 0; i < input.size() / 2; i++)
+        {
+            T temp = input.get(i);
+            input.set(i, input.get(input.size() - i - 1));
+            input.set(input.size() - i - 1, temp);
+        }
+        return input;
+    }
+
+    public static <T> T[] toArray( List<T> list )
+    {
+        return (T[]) list.toArray();
+    }
+
+    public static <IN, OUT> List<OUT> map( List<IN> input, Function<IN, OUT> func )
+    {
+        List<OUT> out = new ArrayList<>(input.size());
+        input.forEach( (i) -> out.add( func.apply(i) ) );
+        return out;
+    }
 }

@@ -5,8 +5,8 @@ import com.github.mustachejava.Mustache;
 import com.github.mustachejava.MustacheFactory;
 import holon.Holon;
 import holon.api.config.Config;
-import holon.api.template.Template;
-import holon.api.template.Templates;
+import holon.api.http.Content;
+import holon.contrib.template.Templates;
 
 public class MustacheTemplateEngine implements Templates
 {
@@ -25,7 +25,7 @@ public class MustacheTemplateEngine implements Templates
     }
 
     @Override
-    public Template load( String path )
+    public Content load( String path )
     {
         Mustache compile = mustacheFactory.compile( path );
         return new MustacheTemplate(compile);

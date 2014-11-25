@@ -1,8 +1,11 @@
 package holon.internal.routing.annotated;
 
+import java.io.IOException;
 import java.lang.annotation.Annotation;
 
-import holon.api.http.Request;
+import holon.api.exception.HolonException;
+import holon.api.middleware.Pipeline;
+import holon.spi.RequestContext;
 
 public interface ArgInjectionStrategy
 {
@@ -19,12 +22,19 @@ public interface ArgInjectionStrategy
             this.position = position;
         }
 
-        public void apply( Object[] args, Request ctx )
+        public void apply( Object[] args, RequestContext ctx, Pipeline pipeline )
         {
-            args[position] = generateArgument( ctx );
+            try
+            {
+                args[position] = generateArgument( ctx, pipeline );
+            }
+            catch ( IOException e )
+            {
+                throw new HolonException( "IO exception while gathering values for dependency injection.", e );
+            }
         }
 
-        public abstract Object generateArgument( Request ctx );
+        public abstract Object generateArgument( RequestContext ctx, Pipeline pipeline ) throws IOException;
     }
 
     boolean appliesTo( Class<?> type, Annotation[] annotation );

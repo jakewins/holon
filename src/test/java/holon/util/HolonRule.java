@@ -19,6 +19,91 @@
  */
 package holon.util;
 
-public class HolonRule
+import java.io.File;
+import java.io.IOException;
+
+import holon.Holon;
+import holon.api.config.Config;
+import holon.api.exception.HolonException;
+import holon.internal.HolonFactory;
+import holon.internal.config.ConfigBuilder;
+import holon.internal.config.MapConfig;
+import holon.util.io.FileTools;
+import org.junit.rules.ExternalResource;
+
+import static holon.Holon.Configuration.app_name;
+import static holon.Holon.Configuration.home_dir;
+import static holon.Holon.Configuration.http_port;
+import static holon.util.collection.ArrayTools.map;
+import static holon.util.io.Ports.findUnusedPort;
+import static java.util.Arrays.asList;
+import static junit.framework.TestCase.assertTrue;
+
+public class HolonRule extends ExternalResource
 {
+    private final Class<?>[] endpoints;
+    private final Object[] injectables;
+    private final Config config;
+
+    private Holon holon;
+    private File home;
+
+    public HolonRule( Class<?> endpointClass )
+    {
+        this(new Class[]{endpointClass}, new Object[]{}, new MapConfig());
+    }
+
+    public HolonRule( Class<?>[] endpointClasses, Class<?>[] middleware )
+    {
+        this(endpointClasses, new Object[]{}, new ConfigBuilder()
+                .set( Holon.Configuration.middleware, map( asList( middleware ), Class::getName )).build());
+    }
+
+    public HolonRule( Class<?>[] endpointClasses, Object[] injectables, Config config )
+    {
+        this.endpoints = endpointClasses;
+        this.injectables = injectables;
+        this.config = config;
+    }
+
+    @Override
+    protected void before() throws Throwable
+    {
+        newHomeDir();
+
+        this.config.set( http_port, "" + findUnusedPort() );
+        this.config.set( app_name,  "testapp" );
+        this.config.set( home_dir,  home.getAbsolutePath() );
+
+        holon = new HolonFactory().newHolon( config, injectables, endpoints );
+        holon.start();
+    }
+
+    @Override
+    protected void after()
+    {
+        holon.stop();
+        FileTools.deleteRecursively( home );
+    }
+
+    public String httpUrl()
+    {
+        return "http://localhost:" + config.get( http_port );
+    }
+
+    private void newHomeDir()
+    {
+        try
+        {
+            home = File.createTempFile( "holon", null );
+            assertTrue( home.delete() );
+            assertTrue( home.mkdirs() );
+            assertTrue( new File( home, "public").mkdir() );
+        }
+        catch ( IOException e )
+        {
+            throw new HolonException("Unable to create temporary Holon home folder.", e );
+        }
+
+    }
 }

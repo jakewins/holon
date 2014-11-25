@@ -13,7 +13,6 @@ import holon.api.http.HEAD;
 import holon.api.http.OPTIONS;
 import holon.api.http.POST;
 import holon.api.http.PUT;
-import holon.internal.routing.annotated.RouteCompiler;
 import holon.spi.Route;
 import org.reflections.Reflections;
 import org.reflections.scanners.ResourcesScanner;
@@ -37,17 +36,22 @@ public class RouteScanner
     public void scan( String basePath, String packageName, Consumer<Route> routeProcessor )
     {
         listClassesIn( packageName ).forEach( cls -> {
-            for ( Method method : cls.getDeclaredMethods() )
+            scan( basePath, cls, routeProcessor );
+        });
+    }
+
+    public void scan( String basePath, Class cls, Consumer<Route> routeProcessor )
+    {
+        for ( Method method : cls.getDeclaredMethods() )
+        {
+            for ( Annotation annotation : method.getAnnotations() )
             {
-                for ( Annotation annotation : method.getAnnotations() )
+                if ( isRouteAnnotation( annotation ) )
                 {
-                    if ( isRouteAnnotation( annotation ) )
-                    {
-                        routeProcessor.accept( routeCompiler.compile( basePath, cls, method, annotation ) );
-                    }
+                    routeProcessor.accept( routeCompiler.compile( basePath, cls, method, annotation ) );
                 }
             }
-        });
+        }
     }
 
     private Set<Class<?>> listClassesIn( String packageName )

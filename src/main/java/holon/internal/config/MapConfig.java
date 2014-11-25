@@ -5,12 +5,29 @@ import java.util.Map;
 
 import holon.api.config.Config;
 import holon.api.config.Setting;
+import holon.api.exception.MissingConfigurationException;
 
 public class MapConfig implements Config
 {
     private final Map<String, Object> params;
 
-    public MapConfig(Map<String, Object> params)
+    /** Construct a config object from a map of settings and values. */
+    public static Config config( Map<Setting<?>, Object> settings )
+    {
+        MapConfig config = new MapConfig();
+        for ( Map.Entry<Setting<?>, Object> kv : settings.entrySet() )
+        {
+            config.set( kv.getKey(), kv.getValue() );
+        }
+        return config;
+    }
+
+    public MapConfig()
+    {
+        this(new HashMap<>());
+    }
+
+    MapConfig(Map<String, Object> params)
     {
         this.params = params;
     }
@@ -34,7 +51,14 @@ public class MapConfig implements Config
 
         if(level == null)
         {
-            return setting.apply( setting.defaultValue(this) );
+            try
+            {
+                return setting.apply( setting.defaultValue( this ) );
+            }
+            catch( MissingConfigurationException e )
+            {
+                throw new MissingConfigurationException( setting );
+            }
         }
 
         return setting.apply( level );

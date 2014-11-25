@@ -22,6 +22,14 @@ package holon.api.middleware;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.RetentionPolicy;
 
+/**
+ * This is used to mark a method in an arbitrary class as a middleware handler. A class can have multiple of these,
+ * and they will then be invoked in undefined order.
+ *
+ * Note that middleware classes are single threaded and shared-nothing. This means the same middleware applied to two
+ * separate routes will be two distinct instances. If you want global data available to be shared across middleware
+ * instances, you need to provide an injectable component to contain that global state.
+ */
 @java.lang.annotation.Target({ElementType.METHOD})
 @java.lang.annotation.Retention(RetentionPolicy.RUNTIME)
 public @interface MiddlewareHandler

@@ -1,7 +1,5 @@
 package holon.spi;
 
-import holon.api.http.Request;
-
 public interface Route
 {
     public interface PathPattern
@@ -31,5 +29,5 @@ public interface Route
     String method();
     PathPattern pattern();
 
-    void call( Request req );
+    void call( RequestContext req );
 }

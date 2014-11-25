@@ -19,6 +19,79 @@
  */
 package holon.internal.routing.annotated.injection;
 
-public class CookieParamInjectionStrategy
+import java.io.IOException;
+import java.lang.annotation.Annotation;
+
+import holon.api.exception.HolonException;
+import holon.api.http.Cookie;
+import holon.api.http.CookieParam;
+import holon.api.http.Cookies;
+import holon.api.middleware.Pipeline;
+import holon.internal.routing.annotated.ArgInjectionStrategy;
+import holon.spi.RequestContext;
+
+public class CookieParamInjectionStrategy implements ArgInjectionStrategy
 {
+    @Override
+    public boolean appliesTo( Class<?> type, Annotation[] annotations )
+    {
+        for ( Annotation annotation : annotations )
+        {
+            if(annotation instanceof CookieParam )
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public ArgumentInjector satisfyArgument( Object[] args, int position, Class<?> type, Annotation[] annotations )
+    {
+        // First, check if the annotation specifies a specific attribute to use, and if it does, set things up
+        // to inject the value of that attribute directly
+        for ( Annotation annotation : annotations )
+        {
+            if(annotation instanceof CookieParam )
+            {
+                final String name = ((CookieParam)annotation).value();
+                if(!name.equals( "" ))
+                {
+                    if(type == Cookie.class)
+                    {
+                        return new ArgumentInjector(position)
+                        {
+                            @Override
+                            public Object generateArgument( RequestContext ctx, Pipeline pipeline ) throws IOException
+                            {
+                                Cookie o = ctx.cookies().get( name );
+                                if(o == null)
+                                {
+                                    throw new HolonException( "Missing required cookie '" + name + "'" );
+                                }
+                                return o;
+                            }
+                        };
+                    }
+
+                    throw new IllegalArgumentException( "Cookie attribute needs to be a Cookie, but was " + type + "." );
+                }
+            }
+        }
+
+        // If a specific attribute was not asked for, the user should get the full attribute map
+        if(type != Cookies.class)
+        {
+            throw new IllegalArgumentException( "CookieParam attribute needs to be Cookies, but was " + type + "." );
+        }
+
+        return new ArgumentInjector(position)
+        {
+            @Override
+            public Object generateArgument( RequestContext ctx, Pipeline pipeline ) throws IOException
+            {
+                return ctx.cookies();
+            }
+        };
+    }
 }

@@ -19,6 +19,22 @@
  */
 package holon.contrib.caching;
 
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
+import holon.api.middleware.MiddlewareAnnotation;
+
+@Retention(RetentionPolicy.RUNTIME)
+@MiddlewareAnnotation(CachingMiddleware.class)
 public @interface Cached
 {
+    /**
+     * Key for the cached response, defaults to the route path. This may be used, depending on caching backend,
+     * to manipulate cached entities, such as invalidating cache entries before the timeout.
+     */
+    String cacheKey() default "";
+
+    /** Time, in seconds, to cache responses */
+    int time() default 120;
 }

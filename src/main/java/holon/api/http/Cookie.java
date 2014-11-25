@@ -21,4 +21,17 @@ package holon.api.http;
 
 public interface Cookie
 {
+    String value();
+
+    String name();
+
+    String path();
+
+    String domain();
+
+    int maxAge();
+
+    boolean secure();
+
+    boolean httpOnly();
 }

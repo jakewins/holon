@@ -1,6 +1,7 @@
 package holon.internal.routing;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import holon.internal.di.Components;
@@ -17,7 +18,7 @@ public class RouteScannerTest
     public void shouldFindRoutes() throws Exception
     {
         // Given
-        RouteScanner discoverer = new RouteScanner( new RouteCompiler( new Components() ) );
+        RouteScanner discoverer = new RouteScanner( new RouteCompiler( new Components(), Collections.emptyList() ) );
 
         List<Route> routes = new ArrayList<>();
 
@@ -26,7 +27,7 @@ public class RouteScannerTest
 
         // Then
         Assert.assertThat( routes.size(), Matchers.equalTo( 1 ) );
-        Assert.assertThat( routes.get( 0 ).pattern(), Matchers.equalTo( "/myroot/hello/world" ) );
+        Assert.assertThat( routes.get( 0 ).pattern().pattern(), Matchers.equalTo( "/myroot/hello/world" ) );
         Assert.assertThat( routes.get( 0 ).method(), Matchers.equalTo( HttpMethod.Standard.GET ) );
     }
 }

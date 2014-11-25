@@ -19,6 +19,36 @@
  */
 package holon.contrib.session;
 
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
 public class Sessions
 {
+    private final ConcurrentMap<String, Session> sessions = new ConcurrentHashMap<>();
+
+    public Session newSession()
+    {
+        Session session = new Session(UUID.randomUUID().toString());
+        while( sessions.putIfAbsent( session.key(), session ) != null )
+        {
+            session.setKey( UUID.randomUUID().toString() );
+        }
+        return session;
+    }
+
+    public Session getOrCreate( String sessionKey )
+    {
+        Session session = sessions.get( sessionKey );
+        if(session == null)
+        {
+            session = new Session( sessionKey );
+            Session preExisting = sessions.putIfAbsent( sessionKey, session );
+            if(preExisting != null)
+            {
+                session = preExisting;
+            }
+        }
+        return session;
+    }
 }

@@ -7,9 +7,12 @@ public class ContentTypes
 {
     private static final Map<String, String> suffixToContentType = new HashMap<>();
 
-    static {
-        suffixToContentType.put( "css", "text/css" );
+    static
+    {
+        suffixToContentType.put( "css",  "text/css" );
         suffixToContentType.put( "html", "text/html" );
+        suffixToContentType.put( "js",   "application/javascript" );
+        suffixToContentType.put( "json", "application/json" );
     }
 
     public static String contentTypeForSuffix( String suffix )

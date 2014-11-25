@@ -6,12 +6,9 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.channels.ReadableByteChannel;
-import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.Charset;
 
-import holon.api.exception.HolonException;
-import holon.api.io.Output;
+import holon.api.http.Output;
 
 /**
  * In-memory output backed by a byte array.
@@ -27,18 +24,11 @@ public class ByteArrayOutput implements Output
     }
 
     @Override
-    public void write( SeekableByteChannel channel )
+    public void write( FileChannel channel ) throws IOException
     {
-        try
-        {
-            ByteBuffer buffer = ByteBuffer.allocate( (int) channel.size() );
-            channel.read( buffer );
-            baos.write( buffer.array(), 0, (int) channel.size() );
-        }
-        catch(IOException e)
-        {
-            throw new HolonException( "Unable to read file.", e );
-        }
+        ByteBuffer buffer = ByteBuffer.allocate( (int) channel.size() );
+        channel.read( buffer );
+        baos.write( buffer.array(), 0, (int) channel.size() );
     }
 
     public byte[] toByteArray()

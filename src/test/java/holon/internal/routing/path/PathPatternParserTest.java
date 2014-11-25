@@ -19,8 +19,38 @@
  */
 package holon.internal.routing.path;
 
-import junit.framework.TestCase;
+import org.junit.Test;
 
-public class PathPatternParserTest extends TestCase
+import static holon.internal.routing.path.PathPatternParser.NamedWildcardSegment;
+import static holon.internal.routing.path.PathPatternParser.StaticParsedSegment;
+import static holon.util.collection.Iterables.toList;
+import static java.util.Arrays.asList;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+
+public class PathPatternParserTest
 {
+
+    @Test
+    public void shouldParsePatternWithNamedSegments() throws Exception
+    {
+        // When & then
+        assertThat( toList( new PathPatternParser().parse( "/hello/{world}" ) ),
+            equalTo(asList(new StaticParsedSegment( "hello" ), new NamedWildcardSegment( "world" ))) );
+        assertThat( toList( new PathPatternParser().parse( "/hello/{world}/" ) ),
+                equalTo(asList(new StaticParsedSegment( "hello" ), new NamedWildcardSegment( "world" ))) );
+        assertThat( toList( new PathPatternParser().parse( "hello/{world}/" ) ),
+                equalTo(asList(new StaticParsedSegment( "hello" ), new NamedWildcardSegment( "world" ))) );
+    }
+
+    @Test
+    public void shouldParseStaticPatterns() throws Exception
+    {
+        // When & then
+        assertThat( toList( new PathPatternParser().parse( "/" ) ),
+                equalTo(asList()) );
+        assertThat( toList( new PathPatternParser().parse( "" ) ),
+                equalTo(asList()) );
+    }
+
 }

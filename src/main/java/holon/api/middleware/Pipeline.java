@@ -19,8 +19,26 @@
  */
 package holon.api.middleware;
 
+import holon.api.http.Request;
+import holon.spi.RequestContext;
+
 public interface Pipeline
 {
-    void satisfyDependency( Object component );
+    /**
+     * Satisfy an injectable dependency for middlewares and the endpoint that are after us in the pipeline, this allows
+     * setting request-specific injectable components through your middleware.
+     */
+    <T> void satisfyDependency( Class<T> cls, T component );
+
+    /**
+     * Forward the call to the next step in the pipeline.
+     */
     void call();
+
+    /**
+     * Forward the call to the next step in the pipeline - but override the request subsequent pipeline steps get.
+     * This can be used to intercept the response, which you would do by sending in a Request object that wraps the
+     * request you got, but overrides the {@link Request#respond(holon.api.http.Status, holon.api.http.Content)} method.
+     */
+    void call(RequestContext req);
 }

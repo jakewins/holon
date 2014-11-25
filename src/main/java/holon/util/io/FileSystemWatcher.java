@@ -85,7 +85,7 @@ public class FileSystemWatcher implements Scheduler.Job
                     pollModifications();
                 }
 
-                Thread.sleep( 200 );
+                Thread.sleep( 500 );
                 valid = key == null || key.reset();
             }
         }

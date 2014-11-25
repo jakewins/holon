@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
+import holon.api.exception.HolonException;
+
 public class SettingConverters
 {
 
@@ -37,6 +39,20 @@ public class SettingConverters
     public static Function<String, String> string()
     {
         return str -> str;
+    }
+
+    public static Function<String, Class<?>> clazz()
+    {
+        return str -> {
+            try
+            {
+                return Class.forName( str );
+            }
+            catch ( ClassNotFoundException e )
+            {
+                throw new HolonException( "Unable to find class: " + str );
+            }
+        };
     }
 
     public static Function<String, Integer> integer()

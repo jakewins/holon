@@ -23,10 +23,11 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
 /**
- * A parameter provided through HTTP query params - or a map of all GET parameters if no parameter name is specified.
+ * A parameter provided through HTTP query params - or a map of all query parameters if no parameter name is specified.
  */
 @Retention(RetentionPolicy.RUNTIME)
 public @interface QueryParam
 {
     String value() default "";
+    String defaultVal() default "";
 }

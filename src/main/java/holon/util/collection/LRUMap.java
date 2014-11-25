@@ -16,11 +16,11 @@ public class LRUMap<K, V> implements Map<K, V>
 {
     private final LRUEntry<K,V>[] buckets;
     private final BiConsumer<K, V> removeHandler;
-    private final int maxItems;
 
-    private LRUEntry<K,V> nextFree;
     private int size = 0;
 
+    // Head of freelist
+    private LRUEntry<K,V> nextFree;
 
     // LRU-K variables
     private int            clockBucket = 0;
@@ -35,8 +35,8 @@ public class LRUMap<K, V> implements Map<K, V>
         }
         this.removeHandler = removeHandler;
         this.buckets = new LRUEntry[slots];
-        this.maxItems = Math.round( slots * loadFactor );
 
+        int maxItems = Math.round( slots * loadFactor );
         for ( int i = 0; i < maxItems; i++ )
         {
             nextFree = new LRUEntry<>( null, null, nextFree );
@@ -281,7 +281,7 @@ public class LRUMap<K, V> implements Map<K, V>
         return (int) ((value >>> 32) ^ value);
     }
 
-    private class LRUEntry<K,V> implements Entry<K, V>
+    private static class LRUEntry<K,V> implements Entry<K, V>
     {
         private byte usageCount = -1;
 

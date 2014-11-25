@@ -19,6 +19,17 @@
  */
 package holon.api.http;
 
+import java.io.File;
+
+/**
+ * Represents a file uploaded as HTTP data.
+ */
 public interface UploadedFile
 {
+    /** The client-specified file name. */
+    String fileName();
+    /** The client-specified content type. */
+    String contentType();
+    /** The file. This may be deleted after a request is completed, you should move it if you'd like to keep it. */
+    File file();
 }

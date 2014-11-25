@@ -19,6 +19,25 @@
  */
 package holon.util.io;
 
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.util.Random;
+
 public class Ports
 {
+    public static int findUnusedPort()
+    {
+        Random rand = new Random();
+        int port = 8080;
+        for (int i=1000; i --> 0 ;) {
+            try {
+                ServerSocket serverSocket = new ServerSocket( port );
+                serverSocket.close();
+                return port;
+            } catch (IOException ex) {}
+            port = 1024 + rand.nextInt( 10_000 );
+        }
+
+        throw new RuntimeException("no free port found");
+    }
 }

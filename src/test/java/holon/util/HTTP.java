@@ -19,6 +19,185 @@
  */
 package holon.util;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Scanner;
+
+import holon.api.exception.HolonException;
+import holon.api.http.Cookie;
+import holon.internal.http.common.StandardCookie;
+import holon.util.collection.Maps;
+import org.apache.http.Header;
+import org.apache.http.HeaderIterator;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.config.CookieSpecs;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.protocol.HttpClientContext;
+import org.apache.http.entity.mime.MultipartEntity;
+import org.apache.http.entity.mime.content.FileBody;
+import org.apache.http.entity.mime.content.StringBody;
+import org.apache.http.impl.client.BasicCookieStore;
+import org.apache.http.impl.client.HttpClients;
+
 public class HTTP
 {
+    public static class Response
+    {
+        private final HttpResponse rawResponse;
+        private final HttpClientContext context;
+
+        public Response( HttpResponse rawResponse, HttpClientContext context )
+        {
+            this.rawResponse = rawResponse;
+            this.context = context;
+        }
+
+        public int status()
+        {
+            return rawResponse.getStatusLine().getStatusCode();
+        }
+
+        public Map<String, Cookie> cookies()
+        {
+            Map<String, Cookie> cookies = new HashMap<>();
+            for ( org.apache.http.cookie.Cookie cookie : context.getCookieStore().getCookies() )
+            {
+                cookies.put( cookie.getName(), new StandardCookie(cookie.getName(), cookie.getValue(), cookie.getDomain(), cookie.getPath(), cookie.getExpiryDate()) );
+            }
+            return cookies;
+        }
+
+        @Override
+        public String toString()
+        {
+            return String.format( "%d\n%s\n%s", status(), headersAsString(), contentAsString() );
+        }
+
+        private String headersAsString()
+        {
+            StringBuilder sb = new StringBuilder();
+            HeaderIterator headers = rawResponse.headerIterator();
+            while(headers.hasNext())
+            {
+                Header header = headers.nextHeader();
+                sb.append( header.getName() ).append( ": " ).append( header.getValue() ).append( "\n" );
+            }
+            return sb.toString();
+        }
+
+        public String contentAsString()
+        {
+            try(InputStream stream = rawResponse.getEntity().getContent())
+            {
+                Scanner scanner = new Scanner( stream ).useDelimiter( "\\A" );
+
+                return scanner.hasNext() ? scanner.next() : "";
+            }
+            catch(IOException e)
+            {
+                throw new HolonException( "Failed to read http response body.", e );
+            }
+        }
+    }
+
+    public interface Payload
+    {
+        HttpEntity createEntity();
+    }
+
+    public static class HttpExchange
+    {
+        private final BasicCookieStore cookieStore = new BasicCookieStore();
+        private final HttpClientContext context = HttpClientContext.create();
+
+        private final HttpClient client = HttpClients.custom()
+                .setDefaultRequestConfig( RequestConfig.custom().setCookieSpec( CookieSpecs.BEST_MATCH).build() )
+                .setDefaultCookieStore( cookieStore ).build();
+
+        public HttpExchange()
+        {
+            context.setCookieStore(cookieStore);
+        }
+
+        public Response POST( String path, Payload payload )
+        {
+            HttpPost post = new HttpPost( path );
+            post.setEntity(payload.createEntity());
+            return send( post );
+        }
+
+        public Response GET( String path )
+        {
+            return send(new HttpGet( path ));
+        }
+
+        private Response send( HttpUriRequest req )
+        {
+            try
+            {
+                return new Response(client.execute(req, context), context);
+            }
+            catch ( IOException e )
+            {
+                throw new RuntimeException( e );
+            }
+        }
+    }
+
+    public static Payload form( Object ... alternatingKeyValue )
+    {
+        return form( Maps.map(alternatingKeyValue));
+    }
+
+    public static Payload form( Map<String, Object> fields )
+    {
+        return () -> {
+            MultipartEntity entity = new MultipartEntity();
+            for ( Map.Entry<String, Object> entry : fields.entrySet() )
+            {
+                if(entry.getValue() instanceof File )
+                {
+                    entity.addPart(entry.getKey(), new FileBody( (File) entry.getValue() ));
+                }
+                else
+                {
+                    try
+                    {
+                        entity.addPart( entry.getKey(), new StringBody( (String) entry.getValue() ) );
+                    }
+                    catch ( UnsupportedEncodingException e )
+                    {
+                        throw new RuntimeException( e );
+                    }
+                }
+            }
+            return entity;
+        };
+    }
+
+    public static HttpExchange exchange()
+    {
+        return new HttpExchange();
+    }
+
+    public static Response POST( String path, Payload payload )
+    {
+        return exchange().POST(path, payload);
+    }
+
+    public static Response GET( String path )
+    {
+        return exchange().GET( path );
+    }
+
+
 }

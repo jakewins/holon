@@ -1,9 +1,16 @@
 package holon.api.exception;
 
+import holon.api.config.Setting;
+
 public class MissingConfigurationException extends HolonException
 {
-    public MissingConfigurationException( String setting )
+    public MissingConfigurationException()
     {
-        super(String.format("Setting '%s' is required, you need to configure this.", setting), null);
+        super("Missing required setting.", null);
+    }
+
+    public MissingConfigurationException( Setting<?> setting )
+    {
+        super(String.format( "Missing required setting '%s', please configure this.", setting.key() ) );
     }
 }

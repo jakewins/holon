@@ -19,6 +19,7 @@
  */
 package holon.api.http;
 
-public interface Cookies
+public interface Cookies extends Iterable<Cookie>
 {
+    Cookie get( String name );
 }

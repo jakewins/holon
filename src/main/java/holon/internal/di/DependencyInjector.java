@@ -19,6 +19,79 @@
  */
 package holon.internal.di;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+import holon.api.exception.HolonException;
+
 public class DependencyInjector
 {
+    private final Components components;
+
+    public DependencyInjector( Components components )
+    {
+        this.components = components;
+    }
+
+    public <T> T instantiate( Class<T> cls )
+    {
+        return instantiate( cls, Collections.emptyList() );
+    }
+
+    public <T> T instantiate( Class<T> cls, Collection<Object> additionalInjectables )
+    {
+        try
+        {
+            Components additionalComponents = new Components();
+            if(additionalInjectables.size() > 0)
+            {
+                for ( Object additionalInjectable : additionalInjectables )
+                {
+                    if(additionalInjectable != null)
+                    {
+                        additionalComponents.register( additionalInjectable );
+                    }
+                }
+
+            }
+            Set<String> unusableConstructors = new HashSet<>();
+            constructorLoop: for ( Constructor<?> constructor : cls.getConstructors() )
+            {
+                List<Object> args = new ArrayList<>();
+                for ( Class<?> dependency : constructor.getParameterTypes() )
+                {
+                    if(additionalComponents.contains( dependency ))
+                    {
+                        args.add( additionalComponents.resolve( dependency ) );
+                        continue;
+                    }
+
+                    if(!components.contains(dependency))
+                    {
+                        unusableConstructors.add( dependency.getName() );
+                        continue constructorLoop;
+                    }
+
+                    args.add( components.resolve( dependency ) );
+                }
+
+                // Found a constructor we can use.
+                return (T)constructor.newInstance( args.toArray() );
+            }
+
+            throw new HolonException( "Cannot find a usable constructor for '" + cls.getSimpleName()
+                    + "'. Make sure there is a constructor, and that all arguments to it are registered for " +
+                    "dependency injection. " + unusableConstructors, null );
+        }
+        catch ( InstantiationException | IllegalAccessException | InvocationTargetException e)
+        {
+            throw new HolonException( "Unable to instantiate route.", e);
+        }
+    }
 }

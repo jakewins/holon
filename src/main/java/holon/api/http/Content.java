@@ -1,19 +1,17 @@
 package holon.api.http;
 
 import java.io.IOException;
-import java.util.Map;
 
-import holon.api.io.Output;
-
-@FunctionalInterface
+/**
+ * This embodies the content of a response to a client. Content is re-usable and single-threaded. Users are encouraged
+ * to create content instances up-front and to set them on final fields, and then re-use the same content instance
+ * for multiple responses. This is meant to minimize object allocation, so as to not trigger latency-inducing GC pauses.
+ */
 public interface Content
 {
-    void render( Map<String, Object> ctx, Output out ) throws IOException;
+    /** Render the body of this content. */
+    void render(Output out, Object context) throws IOException;
 
-    default String type() { return "text/html"; }
-
-    /**
-     * Set additional headers.
-     */
-    default Map<String, String> headers() { return null; }
+    /** Unless the user has specifically set the Content-type header, this content type will be used. */
+    default String contentType(Object context) { return "text/html"; }
 }

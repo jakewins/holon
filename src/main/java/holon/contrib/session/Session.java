@@ -19,6 +19,40 @@
  */
 package holon.contrib.session;
 
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+
+/**
+ * Sessions are semi-persisted state on the server that is associated with a user session. They must be thread-safe,
+ * as multiple requests may come in using the same session simultaneously.
+ */
 public class Session
 {
+    private String key;
+    private ConcurrentMap<String, Object> content = new ConcurrentHashMap<>();
+
+    public Session( String key )
+    {
+        this.key = key;
+    }
+
+    public <T> T get( String key )
+    {
+        return (T) content.get( key );
+    }
+
+    public void set( String key, Object value )
+    {
+        content.put( key, value );
+    }
+
+    public String key()
+    {
+        return key;
+    }
+
+    void setKey( String key )
+    {
+        this.key = key;
+    }
 }

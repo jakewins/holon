@@ -2,13 +2,13 @@ package holon.contrib.template.mustache;
 
 import java.io.IOException;
 import java.io.Writer;
-import java.util.Map;
 
 import com.github.mustachejava.Mustache;
-import holon.api.io.Output;
-import holon.api.template.Template;
+import holon.api.http.Content;
+import holon.api.http.Output;
+import holon.internal.http.common.ErrorContent;
 
-public class MustacheTemplate implements Template
+public class MustacheTemplate implements Content
 {
     private final Mustache template;
 
@@ -18,16 +18,21 @@ public class MustacheTemplate implements Template
     }
 
     @Override
-    public void render( Map<String, Object> ctx, Output out ) throws IOException
+    public void render( Output out, Object context ) throws IOException
     {
         Writer writer = out.asWriter();
-        template.execute( writer, ctx );
-        writer.flush();
-    }
 
-    @Override
-    public String type()
-    {
-        return "text/html";
+        try
+        {
+            template.execute( writer, context );
+        }
+        catch(Throwable e)
+        {
+            new ErrorContent().render( out, e );
+        }
+        finally
+        {
+            writer.flush();
+        }
     }
 }

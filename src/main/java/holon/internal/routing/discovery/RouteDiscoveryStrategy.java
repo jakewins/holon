@@ -17,8 +17,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package holon.contrib.middleware;
+package holon.internal.routing.discovery;
 
-public class SimpleSessionMiddleware
+import holon.spi.Route;
+
+public interface RouteDiscoveryStrategy
 {
+    Iterable<Route> loadRoutes();
 }

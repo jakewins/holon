@@ -18,7 +18,7 @@ public interface Setting<T> extends Function<Object, T>
     //
 
     public static Function<Config, Object> NO_DEFAULT = request -> {
-        throw new MissingConfigurationException(((Setting)request).key());
+        throw new MissingConfigurationException();
     };
 
     static Function<Config, Object> defaultValue( Object raw ) {
@@ -54,7 +54,6 @@ public interface Setting<T> extends Function<Object, T>
                     // so we're screwed trying to get the generic type at runtime, since it's defined on this method.
                     // Could be that we can pull it out of the method call somehow, but I'll leave that for later.
                     String[] parts = e.getMessage().split( " " );
-                    String foundType = parts[0];
                     String expectedTYpe = parts[parts.length - 1];
 
                     if( expectedTYpe.contains("Map"))

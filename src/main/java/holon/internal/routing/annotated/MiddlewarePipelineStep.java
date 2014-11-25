@@ -22,12 +22,13 @@ package holon.internal.routing.annotated;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
-import holon.api.http.Request;
 import holon.api.middleware.Pipeline;
+import holon.spi.RequestContext;
 
 /**
  * This is.. very complicated, and I'm not happy with it at all. I wanted a working implementation to weed out
  * implementation kinks, and this is still that first spike. Will need to revisit this.
+ *
  *
  * Middleware is part of the endpoint calling pipeline, and each layer has exactly the same basic powers as endpoints
  * do - they can access global and request-specific components through dependency injection, and they can reply to
@@ -36,28 +37,29 @@ import holon.api.middleware.Pipeline;
  * Middleware has two special powers: They can forward requests up the middleware pipeline and they can inject new
  * request-specific components that become available for dependency injection to components further up the chain.
  *
- *
+ * This class represents one step in the pipeline, associated with one middleware handler. It implements the API that
+ * the middleware handler can use to interact with its special powers.
  */
-public class MiddlewarePipelineStep implements Pipeline, Consumer<Request>
+public class MiddlewarePipelineStep implements Pipeline, Consumer<RequestContext>
 {
-    private final Consumer<Request> nextInChain;
-    private final BiConsumer<Request, Pipeline> middleware;
-    private final MiddlewareProvidedDependencies deps;
+    private final Consumer<RequestContext> nextInChain;
+    private final BiConsumer<RequestContext, Pipeline> middleware;
+    protected final MiddlewareContext ctx;
 
-    private Request request;
+    private RequestContext request;
 
-    public MiddlewarePipelineStep( Consumer<Request> nextInChain, BiConsumer<Request, Pipeline> middleware,
-                                   MiddlewareProvidedDependencies deps )
+    public MiddlewarePipelineStep( Consumer<RequestContext> nextInChain, BiConsumer<RequestContext, Pipeline> middleware,
+                                   MiddlewareContext ctx )
     {
         this.nextInChain = nextInChain;
         this.middleware = middleware;
-        this.deps = deps;
+        this.ctx = ctx;
     }
 
     @Override
-    public void satisfyDependency( Object component )
+    public <T> void satisfyDependency( Class<T> cls, T component )
     {
-        deps.satisfy(component);
+        ctx.satisfy( cls, component );
     }
 
     @Override
@@ -67,8 +69,15 @@ public class MiddlewarePipelineStep implements Pipeline, Consumer<Request>
     }
 
     @Override
-    public void accept( Request request )
+    public void call( RequestContext req )
     {
+        nextInChain.accept( req );
+    }
+
+    @Override
+    public void accept( RequestContext request )
+    {
+        this.request = request;
         middleware.accept( request, this );
     }
 }

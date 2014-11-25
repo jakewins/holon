@@ -19,6 +19,34 @@
  */
 package holon.internal.io;
 
-public class FileOutput
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.Charset;
+
+import holon.api.http.Output;
+
+import static java.nio.channels.Channels.newOutputStream;
+
+public class FileOutput implements Output
 {
+    private final FileChannel ch;
+
+    public FileOutput( FileChannel ch )
+    {
+        this.ch = ch;
+    }
+
+    @Override
+    public Writer asWriter()
+    {
+        return new OutputStreamWriter( newOutputStream( ch ), Charset.forName( "UTF-8" ) );
+    }
+
+    @Override
+    public void write( FileChannel channel ) throws IOException
+    {
+        channel.transferTo( 0, channel.size(), ch );
+    }
 }

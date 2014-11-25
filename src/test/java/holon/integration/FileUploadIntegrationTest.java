@@ -19,6 +19,71 @@
  */
 package holon.integration;
 
+import java.io.File;
+import java.nio.charset.Charset;
+import java.util.concurrent.atomic.AtomicReference;
+
+import holon.api.http.FormParam;
+import holon.api.http.POST;
+import holon.api.http.Request;
+import holon.api.http.Status;
+import holon.api.http.UploadedFile;
+import holon.util.HTTP;
+import holon.util.HolonRule;
+import holon.util.io.FileTools;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
+
+import static holon.util.HTTP.form;
+import static holon.util.collection.Maps.map;
+import static junit.framework.TestCase.assertTrue;
+import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.MatcherAssert.assertThat;
+
 public class FileUploadIntegrationTest
 {
+    @Rule
+    public HolonRule holon = new HolonRule(Endpoint.class);
+
+    @Rule
+    public TemporaryFolder folder = new TemporaryFolder();
+
+    private static AtomicReference<File> uploadTo = new AtomicReference<>();
+    private static AtomicReference<File> uploadedFile = new AtomicReference<>();
+    private static AtomicReference<String> fileName = new AtomicReference<>();
+    private static AtomicReference<String> fileType = new AtomicReference<>();
+
+    public static class Endpoint
+    {
+        @POST("/")
+        public void recieveFile( Request req, @FormParam("file") UploadedFile file )
+        {
+            File dest = new File( uploadTo.get(), "uploaded.file" );
+            assertTrue( file.file().renameTo( dest ) );
+
+            uploadedFile.set( dest );
+            fileName.set( file.fileName() );
+            fileType.set( file.contentType() );
+            req.respond( Status.Code.OK );
+        }
+    }
+
+    @Test
+    public void shouldUploadFile() throws Exception
+    {
+        // Given
+        uploadTo.set( folder.getRoot() );
+        File fileToUpload = folder.newFile();
+
+        FileTools.write( fileToUpload, "Hello, World!", Charset.forName( "UTF-8" ) );
+
+        // When
+        HTTP.Response response = HTTP.POST( holon.httpUrl(), form( map( "file", fileToUpload ) ) );
+
+        // Then
+        assertThat(response.status(), equalTo(200));
+        assertThat(FileTools.read( uploadedFile.get(), Charset.forName( "UTF-8" ) ), equalTo("Hello, World!") );
+        assertThat(fileName.get(), equalTo(fileToUpload.getName()));
+    }
 }

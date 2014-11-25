@@ -19,6 +19,29 @@
  */
 package holon.util.collection;
 
-public class Pair
+public final class Pair<A,B>
 {
+    private final A first;
+    private final B second;
+
+    public Pair( A first, B second )
+    {
+        this.first = first;
+        this.second = second;
+    }
+
+    public B second()
+    {
+        return second;
+    }
+
+    public A first()
+    {
+        return first;
+    }
+
+    public static <T1, T2> Pair<T1,T2> pair( T1 first, T2 second )
+    {
+        return new Pair<>(first,second);
+    }
 }

@@ -19,6 +19,26 @@
  */
 package holon.internal.http.common;
 
-public class ErrorContent
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.Writer;
+
+import holon.api.http.Content;
+import holon.api.http.Output;
+
+public class ErrorContent implements Content
 {
+    @Override
+    public void render( Output out, Object error ) throws IOException
+    {
+        Writer writer = out.asWriter();
+        writer.write(
+                "<html><body>" +
+                        "<h1>500 Server Error</h1>" +
+                        "<pre>"
+        );
+        ((Throwable)error).printStackTrace( new PrintWriter( writer ) );
+        writer.write( "</pre></body></html>" );
+        writer.flush();
+    }
 }

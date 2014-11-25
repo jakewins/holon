@@ -17,41 +17,45 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package holon.contrib.caching;
+package holon.contrib.session;
 
-import java.io.IOException;
-
-import holon.api.http.PathParam;
+import holon.api.http.Cookie;
+import holon.api.http.CookieParam;
+import holon.api.http.Cookies;
+import holon.api.http.Request;
 import holon.api.middleware.MiddlewareHandler;
 import holon.api.middleware.Pipeline;
-import holon.spi.RequestContext;
 
-public class CachingMiddleware
+/**
+ * Middleware that keeps in-memory session objects using a cookie to track the user.
+ */
+public class SimpleSessionMiddleware
 {
-    private final HttpCache cache;
-    private final String cacheKey;
+    private final String cookieName = "__h_session";
 
-    public CachingMiddleware( Cached annotation, HttpCache cache)
+    private final Sessions sessions;
+
+    public SimpleSessionMiddleware( Sessions sessions )
     {
-        this.cache = cache;
-        this.cacheKey = annotation.cacheKey();
+        this.sessions = sessions;
     }
 
     @MiddlewareHandler
-    public void handle(Pipeline pipeline, RequestContext req, @PathParam String path) throws IOException
+    public void handle( Pipeline pipeline, Request req, @CookieParam Cookies cookies ) throws Exception
     {
-        cache.respond( req, key(path), pipeline );
-    }
-
-    private String key( String path )
-    {
-        if(cacheKey.length() > 0)
+        Session session;
+        Cookie cookie = cookies.get( cookieName );
+        if(cookie == null)
         {
-            return cacheKey;
+            session = sessions.newSession();
+            req.addCookie( cookieName, session.key() );
         }
         else
         {
-            return path;
+            session = sessions.getOrCreate( cookie.value() );
         }
+
+        pipeline.satisfyDependency( Session.class, session );
+        pipeline.call();
     }
 }

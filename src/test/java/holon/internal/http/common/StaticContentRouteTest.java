@@ -1,5 +1,18 @@
 package holon.internal.http.common;
 
+import holon.api.http.Content;
+import holon.api.http.Cookies;
+import holon.api.http.Request;
+import holon.api.http.Status;
+import holon.internal.io.ByteArrayOutput;
+import holon.internal.routing.path.PatternSegment;
+import holon.spi.RequestContext;
+import holon.util.io.FileTools;
+import holon.util.scheduling.TestScheduler;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -7,19 +20,10 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.Map;
 
-import holon.api.http.Content;
-import holon.api.http.Request;
-import holon.api.http.Status;
-import holon.internal.io.ByteArrayOutput;
-import holon.util.io.FileTools;
-import holon.util.scheduling.TestScheduler;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-
 import static junit.framework.TestCase.assertFalse;
 import static org.hamcrest.CoreMatchers.equalTo;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 
 public class StaticContentRouteTest
 {
@@ -100,30 +104,41 @@ public class StaticContentRouteTest
 
         // Then
         assertThat(req.status, equalTo(Status.Code.OK));
-        assertThat(req.content.type(), equalTo("text/plain"));
         assertThat( req.out.toByteArray(), equalTo( "Hello, world!".getBytes( "UTF-8" ) ) );
     }
 
-    private static class CollectingRequest implements Request
+    private static class CollectingRequest implements RequestContext
     {
-        private final String path;
+        private final holon.internal.routing.path.Path path;
         public Status status;
         public Content content;
         public ByteArrayOutput out = new ByteArrayOutput();
 
         public CollectingRequest(String path)
         {
-            this.path = path;
+            this.path = new PatternSegment.ParamHandlingPath().initialize( path, null );
         }
 
         @Override
-        public void respond( Status status, Content content, Map<String, Object> context )
+        public void respond( Status status )
+        {
+            respond(status, null);
+        }
+
+        @Override
+        public void respond( Status status, Content content )
+        {
+            respond(status, content, null);
+        }
+
+        @Override
+        public void respond( Status status, Content content, Object context )
         {
             this.status = status;
             this.content = content;
             try
             {
-                content.render( context, out );
+                content.render( out, context );
             }
             catch ( IOException e )
             {
@@ -132,25 +147,56 @@ public class StaticContentRouteTest
         }
 
         @Override
-        public void respond( Status status )
+        public Request addCookie( String name, String value )
         {
-            respond(status, null, null);
+            return null;
         }
 
         @Override
-        public void respond( Status status, Content content )
+        public Request addCookie( String name, String value, String path, String domain, int maxAge, boolean secure,
+                                  boolean httpOnly )
         {
-            respond( status, content, null );
+            return null;
         }
 
         @Override
-        public String path()
+        public Request discardCookie( String name )
+        {
+            return null;
+        }
+
+        @Override
+        public Request addHeader( String header, String value )
+        {
+            return null;
+        }
+
+        @Override
+        public RequestContext initialize( holon.internal.routing.path.Path path )
+        {
+            return null;
+        }
+
+        @Override
+        public holon.internal.routing.path.Path path()
         {
             return path;
         }
 
         @Override
-        public Map<String, String> postData()
+        public Map<String, Object> formData()
+        {
+            return null;
+        }
+
+        @Override
+        public Cookies cookies()
+        {
+            return null;
+        }
+
+        @Override
+        public Map<String, Iterable<String>> queryParams()
         {
             return null;
         }

@@ -1,12 +1,12 @@
-package holon.internal.routing.path;
+package holon.internal.routing.basic;
 
 import java.util.function.Consumer;
 
-import holon.api.http.Request;
 import holon.api.http.Status;
 import holon.internal.http.common.ErrorContent;
 import holon.internal.routing.HttpMethod;
 import holon.internal.routing.path.BasicPathPattern;
+import holon.spi.RequestContext;
 import holon.spi.Route;
 
 /**
@@ -16,9 +16,9 @@ public class CallbackRoute implements Route
 {
     private final HttpMethod httpMethod;
     private final PathPattern path;
-    private final Consumer<Request> endpoint;
+    private final Consumer<RequestContext> endpoint;
 
-    public CallbackRoute( HttpMethod httpMethod, String path, Consumer<Request> endpoint )
+    public CallbackRoute( HttpMethod httpMethod, String path, Consumer<RequestContext> endpoint )
     {
         this.httpMethod = httpMethod;
         this.path = BasicPathPattern.compile( path );
@@ -38,7 +38,7 @@ public class CallbackRoute implements Route
     }
 
     @Override
-    public void call( Request context )
+    public void call( RequestContext context )
     {
         try
         {
@@ -47,7 +47,7 @@ public class CallbackRoute implements Route
         catch(Throwable e)
         {
             e.printStackTrace();//TODO
-            context.respond( Status.Code.SERVER_ERROR, new ErrorContent( e ) );
+            context.respond( Status.Code.SERVER_ERROR, new ErrorContent(), e );
         }
     }
 }

@@ -19,6 +19,46 @@
  */
 package holon.contrib.http;
 
-public class FileContent
+import java.io.File;
+import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.file.StandardOpenOption;
+
+import holon.api.exception.HolonException;
+import holon.api.http.Content;
+import holon.api.http.Output;
+import holon.internal.io.ContentTypes;
+
+public class FileContent implements Content
 {
+    @Override
+    public String contentType(Object context)
+    {
+        String[] split = toFile(context).toURI().getRawPath().split( "\\." );
+        return ContentTypes.contentTypeForSuffix( split[split.length - 1] );
+    }
+
+    @Override
+    public void render( Output out, Object context ) throws IOException
+    {
+        File file = toFile( context );
+        try(FileChannel open = FileChannel.open( file.toPath(), StandardOpenOption.READ ))
+        {
+            out.write( open );
+        }
+    }
+
+    private File toFile( Object context )
+    {
+        File file;
+        if(context instanceof File)
+        {
+            file = (File) context;
+        }
+        else
+        {
+            throw new HolonException( "FileContent needs a single file as its context." );
+        }
+        return file;
+    }
 }
