@@ -25,10 +25,8 @@ import com.lmax.disruptor.dsl.Disruptor;
 import holon.Holon;
 import holon.api.config.Config;
 import holon.api.logging.Logging;
-import holon.internal.http.common.FourOhFourRoute;
 import holon.internal.http.undertow.work.HttpWorkEvent;
 import holon.internal.http.undertow.work.HttpWorkHandler;
-import holon.internal.routing.basic.TreeRouter;
 import holon.spi.HolonEngine;
 import holon.spi.Route;
 import io.undertow.Undertow;
@@ -37,6 +35,7 @@ import io.undertow.server.HttpServerExchange;
 import io.undertow.server.handlers.encoding.ContentEncodingRepository;
 import io.undertow.server.handlers.encoding.EncodingHandler;
 import io.undertow.server.handlers.encoding.GzipEncodingProvider;
+import io.undertow.util.Headers;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -72,39 +71,20 @@ public class UndertowEngine implements HolonEngine
 
         server = Undertow.builder()
             .addHttpListener( httpPort, "0.0.0.0" )
-            .setHandler( new EncodingHandler( new ContentEncodingRepository()
-                    .addEncodingHandler( "gzip", new GzipEncodingProvider(), 50 ) )
+            .setHandler(
+                    new EncodingHandler( new ContentEncodingRepository().addEncodingHandler(
+                            "gzip", new GzipEncodingProvider(), 50 ) )
                     .setNext( new HttpHandler()
                     {
-                        class ThreadContext
-                        {
-                            UndertowRequestContext ctx = new UndertowRequestContext();
-                            TreeRouter router = new TreeRouter( routes.get(), new FourOhFourRoute() );
-                        }
-
-                        private final ThreadLocal<ThreadContext> threadCtx = new ThreadLocal<ThreadContext>()
-                        {
-                            @Override
-                            protected ThreadContext initialValue()
-                            {
-                                System.out.println("Create new thread context..");
-                                return new ThreadContext();
-                            }
-                        };
-
                         @Override
                         public void handleRequest( HttpServerExchange exchange ) throws Exception
                         {
+                            exchange.getResponseHeaders().add( Headers.TRANSFER_ENCODING, "gzip" );
                             if ( exchange.isInIoThread() )
                             {
                                 exchange.dispatch();
                                 ringBuffer.publishEvent( UndertowEngine::translate, this, exchange );
-                                return;
                             }
-
-                            ThreadContext ctx = threadCtx.get();
-                            ctx.router.invoke( exchange.getRequestMethod().toString().toLowerCase(),
-                                    exchange.getRequestPath(), ctx.ctx.initialize( exchange ) );
                         }
                     } ) )
             .build();
