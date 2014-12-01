@@ -19,10 +19,6 @@
  */
 package holon.internal;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.function.Supplier;
-
 import holon.Holon;
 import holon.api.config.Config;
 import holon.api.logging.Logging;
@@ -30,7 +26,7 @@ import holon.contrib.session.Sessions;
 import holon.contrib.template.mustache.MustacheTemplateEngine;
 import holon.internal.di.Components;
 import holon.internal.http.common.StaticContentRoute;
-import holon.internal.http.undertow.UndertowEngine;
+import holon.internal.http.netty.NettyEngine;
 import holon.internal.logging.printstream.PrintStreamLogging;
 import holon.internal.routing.discovery.ExplicitClassRouteDiscovery;
 import holon.internal.routing.discovery.PackageScanRouteDiscovery;
@@ -38,6 +34,10 @@ import holon.internal.routing.discovery.RouteDiscoveryStrategy;
 import holon.spi.Route;
 import holon.util.scheduling.Scheduler;
 import holon.util.scheduling.StandardScheduler;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Supplier;
 
 import static holon.Holon.Configuration.endpoint_packages;
 import static holon.Holon.Configuration.middleware;
@@ -64,7 +64,7 @@ public class HolonFactory
         Logging logging = new PrintStreamLogging( System.out );
         Scheduler scheduler = new StandardScheduler();
         Supplier<Iterable<Route>> routes = loadRoutes( config, scheduler, routeStrategy );
-        return new Holon( new UndertowEngine(config, logging.logger( "holon.engine" )), config, logging, routes );
+        return new Holon( new NettyEngine(config, logging.logger( "holon.engine" )), config, logging, routes );
     }
 
     private Components createInjectableComponents( Config config, Object[] injectables )

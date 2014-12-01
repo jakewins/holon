@@ -17,7 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package holon.internal.http.undertow;
+package holon.internal.http.netty;
 
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.WorkHandler;
@@ -25,32 +25,37 @@ import com.lmax.disruptor.dsl.Disruptor;
 import holon.Holon;
 import holon.api.config.Config;
 import holon.api.logging.Logging;
-import holon.internal.http.undertow.work.HttpWorkEvent;
-import holon.internal.http.undertow.work.HttpWorkHandler;
+import holon.internal.http.netty.work.NettyWorkEvent;
+import holon.internal.http.netty.work.NettyWorkHandler;
 import holon.spi.HolonEngine;
 import holon.spi.Route;
-import io.undertow.Undertow;
-import io.undertow.server.HttpHandler;
-import io.undertow.server.HttpServerExchange;
-import io.undertow.server.handlers.encoding.ContentEncodingRepository;
-import io.undertow.server.handlers.encoding.EncodingHandler;
-import io.undertow.server.handlers.encoding.GzipEncodingProvider;
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.http.HttpContentCompressor;
+import io.netty.handler.codec.http.HttpRequestDecoder;
+import io.netty.handler.codec.http.HttpResponseEncoder;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 
-public class UndertowEngine implements HolonEngine
+public class NettyEngine implements HolonEngine
 {
     private final Logging.Logger logger;
     private final int httpPort;
 
-    private Undertow server;
     private volatile boolean running = false;
     private ExecutorService executor;
-    private Disruptor<HttpWorkEvent> disruptor;
+    private Disruptor<NettyWorkEvent> disruptor;
+    private EventLoopGroup bossGroup;
+    private EventLoopGroup workerGroup;
 
-    public UndertowEngine( Config config, Logging.Logger logger )
+    public NettyEngine( Config config, Logging.Logger logger )
     {
         this.logger = logger;
         this.httpPort = config.get( Holon.Configuration.http_port );
@@ -62,57 +67,39 @@ public class UndertowEngine implements HolonEngine
         running = true;
         executor = Executors.newCachedThreadPool();
 
-        disruptor = new Disruptor<>( HttpWorkEvent::new, 1024, executor );
+        disruptor = new Disruptor<>( NettyWorkEvent::new, 1024, executor );
         disruptor.handleEventsWithWorkerPool( createWorkers( 4, routes ) );
         disruptor.start();
 
-        RingBuffer<HttpWorkEvent> ringBuffer = disruptor.getRingBuffer();
+        RingBuffer<NettyWorkEvent> ringBuffer = disruptor.getRingBuffer();
 
-        server = Undertow.builder()
-            .addHttpListener( httpPort, "0.0.0.0" )
-            .setHandler(
-                    new EncodingHandler( new ContentEncodingRepository().addEncodingHandler(
-                            "gzip", new GzipEncodingProvider(), 50 ) )
-                        .setNext(
-                                new HttpHandler()
-                                {
-                                    @Override
-                                    public void handleRequest( HttpServerExchange exchange ) throws Exception
-                                    {
-                                        if ( exchange.isInIoThread() )
-                                        {
-                                            exchange.dispatch();
-                                            ringBuffer.publishEvent( UndertowEngine::translate, this, exchange );
-                                        }
-                                    }
-                                }))
-            .build();
-        server.start();
+        bossGroup = new NioEventLoopGroup(1);
+        workerGroup = new NioEventLoopGroup();
+
+        ServerBootstrap b = new ServerBootstrap();
+        b.group( bossGroup, workerGroup );
+        b.channel( NioServerSocketChannel.class );
+        b.childHandler(new Initializer(ringBuffer));
+
+        b.bind(httpPort);
+
     }
 
-    private WorkHandler<HttpWorkEvent>[] createWorkers( int count, Supplier<Iterable<Route>> routes )
+    private WorkHandler<NettyWorkEvent>[] createWorkers( int count, Supplier<Iterable<Route>> routes )
     {
         WorkHandler[] handlers = new WorkHandler[count];
         for ( int i = 0; i < count; i++ )
         {
-            handlers[i] = new HttpWorkHandler(routes);
+            handlers[i] = new NettyWorkHandler(routes);
         }
         return handlers;
-    }
-
-    public static void translate(HttpWorkEvent event, long sequence, HttpHandler handler, HttpServerExchange exchange)
-    {
-        event.initialize( exchange, handler );
     }
 
     @Override
     public void shutdown()
     {
-        if(server != null)
-        {
-            server.stop();
-            server = null;
-        }
+        bossGroup.shutdownGracefully();
+        workerGroup.shutdownGracefully();
         if(disruptor != null)
         {
             disruptor.shutdown();
@@ -139,6 +126,29 @@ public class UndertowEngine implements HolonEngine
             {
                 break;
             }
+        }
+    }
+
+    private final static class Initializer extends ChannelInitializer<SocketChannel>
+    {
+        private final RingBuffer<NettyWorkEvent> ringBuffer;
+
+        public Initializer( RingBuffer<NettyWorkEvent> ringBuffer )
+        {
+            this.ringBuffer = ringBuffer;
+        }
+
+        @Override
+        public void initChannel( SocketChannel ch )
+        {
+            ChannelPipeline pipeline = ch.pipeline();
+
+            pipeline.addLast( new HttpRequestDecoder() );
+            pipeline.addLast( new HttpResponseEncoder() );
+
+            pipeline.addLast( new HttpContentCompressor() );
+
+            pipeline.addLast( new NettyServerHandler(ringBuffer) );
         }
     }
 }

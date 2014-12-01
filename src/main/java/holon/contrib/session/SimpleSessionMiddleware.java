@@ -31,7 +31,7 @@ import holon.api.middleware.Pipeline;
  */
 public class SimpleSessionMiddleware
 {
-    private final String cookieName = "__h_session";
+    private final String cookieName = "__hsess";
 
     private final Sessions sessions;
 
