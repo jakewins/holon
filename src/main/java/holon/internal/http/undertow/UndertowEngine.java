@@ -19,10 +19,15 @@
  */
 package holon.internal.http.undertow;
 
+import com.lmax.disruptor.RingBuffer;
+import com.lmax.disruptor.WorkHandler;
+import com.lmax.disruptor.dsl.Disruptor;
 import holon.Holon;
 import holon.api.config.Config;
 import holon.api.logging.Logging;
 import holon.internal.http.common.FourOhFourRoute;
+import holon.internal.http.undertow.work.HttpWorkEvent;
+import holon.internal.http.undertow.work.HttpWorkHandler;
 import holon.internal.routing.basic.TreeRouter;
 import holon.spi.HolonEngine;
 import holon.spi.Route;
@@ -33,6 +38,8 @@ import io.undertow.server.handlers.encoding.ContentEncodingRepository;
 import io.undertow.server.handlers.encoding.EncodingHandler;
 import io.undertow.server.handlers.encoding.GzipEncodingProvider;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 
 public class UndertowEngine implements HolonEngine
@@ -42,6 +49,8 @@ public class UndertowEngine implements HolonEngine
 
     private Undertow server;
     private volatile boolean running = false;
+    private ExecutorService executor;
+    private Disruptor<HttpWorkEvent> disruptor;
 
     public UndertowEngine( Config config, Logging.Logger logger )
     {
@@ -53,10 +62,18 @@ public class UndertowEngine implements HolonEngine
     public void serve( Supplier<Iterable<Route>> routes )
     {
         running = true;
+        executor = Executors.newCachedThreadPool();
+
+        disruptor = new Disruptor<>( HttpWorkEvent::new, 1024, executor );
+        disruptor.handleEventsWithWorkerPool( createWorkers( 4, routes ) );
+        disruptor.start();
+
+        RingBuffer<HttpWorkEvent> ringBuffer = disruptor.getRingBuffer();
+
         server = Undertow.builder()
             .addHttpListener( httpPort, "0.0.0.0" )
             .setHandler( new EncodingHandler( new ContentEncodingRepository()
-                    .addEncodingHandler( "gzip", new GzipEncodingProvider(), 50 ))
+                    .addEncodingHandler( "gzip", new GzipEncodingProvider(), 50 ) )
                     .setNext( new HttpHandler()
                     {
                         class ThreadContext
@@ -70,6 +87,7 @@ public class UndertowEngine implements HolonEngine
                             @Override
                             protected ThreadContext initialValue()
                             {
+                                System.out.println("Create new thread context..");
                                 return new ThreadContext();
                             }
                         };
@@ -77,12 +95,35 @@ public class UndertowEngine implements HolonEngine
                         @Override
                         public void handleRequest( HttpServerExchange exchange ) throws Exception
                         {
-                            ThreadContext threadContext = threadCtx.get();
-                            threadContext.router.invoke( exchange.getRequestMethod().toString().toLowerCase(),
-                                    exchange.getRequestPath(), threadContext.ctx.initialize( exchange ) );
+                            if ( exchange.isInIoThread() )
+                            {
+                                exchange.dispatch();
+                                ringBuffer.publishEvent( UndertowEngine::translate, this, exchange );
+                                return;
+                            }
+
+                            ThreadContext ctx = threadCtx.get();
+                            ctx.router.invoke( exchange.getRequestMethod().toString().toLowerCase(),
+                                    exchange.getRequestPath(), ctx.ctx.initialize( exchange ) );
                         }
-                    } ) ).build();
+                    } ) )
+            .build();
         server.start();
+    }
+
+    private WorkHandler<HttpWorkEvent>[] createWorkers( int count, Supplier<Iterable<Route>> routes )
+    {
+        WorkHandler[] handlers = new WorkHandler[count];
+        for ( int i = 0; i < count; i++ )
+        {
+            handlers[i] = new HttpWorkHandler(routes);
+        }
+        return handlers;
+    }
+
+    public static void translate(HttpWorkEvent event, long sequence, HttpHandler handler, HttpServerExchange exchange)
+    {
+        event.initialize( exchange, handler );
     }
 
     @Override
@@ -91,6 +132,17 @@ public class UndertowEngine implements HolonEngine
         if(server != null)
         {
             server.stop();
+            server = null;
+        }
+        if(disruptor != null)
+        {
+            disruptor.shutdown();
+            disruptor = null;
+        }
+        if( executor != null)
+        {
+            executor.shutdown();
+            executor = null;
         }
         running = false;
     }

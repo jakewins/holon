@@ -62,7 +62,7 @@ public class Holon
                 setting( "application.http.port", integer(), defaultValue( "8080" ) );
 
         public static Setting<Boolean> auto_redeploy =
-                setting( "application.auto_redeploy", bool(), defaultValue( "true" ) );
+                setting( "application.auto_redeploy", bool(), defaultValue( "false" ) );
     }
 
     private final HolonEngine http;
