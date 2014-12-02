@@ -61,12 +61,12 @@ public class GlobalCacheEntry
         {
             try(FileChannel channel = newChannel())
             {
-                this.etag = Digest.md5( channel );
+                this.etag = '"' + Digest.md5( channel ) + '"';
             }
         }
         else
         {
-            this.etag = Digest.md5( "" );
+            this.etag = '"' + Digest.md5( "" ) + '"';
         }
         return this;
     }

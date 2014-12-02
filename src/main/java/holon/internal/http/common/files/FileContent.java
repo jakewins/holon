@@ -27,7 +27,7 @@ public class FileContent implements Content
         this.path = path;
         this.channel = channel;
         this.type = determineType(path);
-        this.etag = channel == null ? Digest.md5( "" ) : Digest.md5( channel );
+        this.etag =  '"' + (channel == null ? Digest.md5( "" ) : Digest.md5( channel )) + '"';
     }
 
     public FileContent( FileChannel channel ) throws IOException
@@ -35,7 +35,7 @@ public class FileContent implements Content
         this.channel = channel;
         this.type = "text/plain";
         this.path = null;
-        this.etag = channel == null ? Digest.md5( "" ) : Digest.md5( channel );
+        this.etag = '"' + (channel == null ? Digest.md5( "" ) : Digest.md5( channel )) + '"';
     }
 
     @Override
