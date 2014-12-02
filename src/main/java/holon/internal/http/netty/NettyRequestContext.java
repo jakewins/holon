@@ -24,6 +24,7 @@ import holon.api.http.Content;
 import holon.api.http.Cookie;
 import holon.api.http.Cookies;
 import holon.api.http.Request;
+import holon.api.http.RequestHeaders;
 import holon.api.http.Status;
 import holon.internal.http.common.StandardCookie;
 import holon.internal.routing.path.Path;
@@ -56,6 +57,7 @@ public class NettyRequestContext implements RequestContext
 {
     private final NettyCookies cookies = new NettyCookies();
     private final NettyOutput output = new NettyOutput();
+    private final NettyRequestHeaders headers = new NettyRequestHeaders();
 
     private final Map<String, String> responseHeaders = new HashMap<>();
     private final Map<String,holon.api.http.Cookie> responseCookies = new HashMap<>();
@@ -86,6 +88,7 @@ public class NettyRequestContext implements RequestContext
         this.cookiesDecoded = false;
         this.contentTypeOverridden = false;
         this.queryParams = null;
+        this.headers.initialize( request.headers() );
         responseHeaders.clear();
         responseCookies.clear();
         discardCookies.clear();
@@ -102,6 +105,12 @@ public class NettyRequestContext implements RequestContext
     public Map<String,Object> formData() throws IOException
     {
         return formData;
+    }
+
+    @Override
+    public RequestHeaders headers()
+    {
+        return headers;
     }
 
     @Override
@@ -258,6 +267,23 @@ public class NettyRequestContext implements RequestContext
         else
         {
             return "text/html";
+        }
+    }
+
+    private static final class NettyRequestHeaders implements RequestHeaders
+    {
+        private HttpHeaders headers;
+
+        @Override
+        public String getFirst( String name )
+        {
+            return headers.get( name );
+        }
+
+        public NettyRequestHeaders initialize(HttpHeaders headers)
+        {
+            this.headers = headers;
+            return this;
         }
     }
 }

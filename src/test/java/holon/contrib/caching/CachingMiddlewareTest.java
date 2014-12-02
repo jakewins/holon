@@ -19,11 +19,6 @@
  */
 package holon.contrib.caching;
 
-import java.io.IOException;
-import java.nio.file.Paths;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-
 import holon.Holon;
 import holon.api.http.GET;
 import holon.api.http.Request;
@@ -31,14 +26,23 @@ import holon.api.http.Status;
 import holon.contrib.http.StringContent;
 import holon.internal.HolonFactory;
 import holon.util.HTTP;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+
 import static holon.Holon.Configuration.home_dir;
+import static holon.Holon.Configuration.workers;
 import static holon.internal.config.MapConfig.config;
 import static holon.util.collection.Maps.map;
+import static io.netty.handler.codec.http.HttpHeaders.Names.ETAG;
+import static io.netty.handler.codec.http.HttpHeaders.Names.IF_NONE_MATCH;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 
@@ -77,8 +81,19 @@ public class CachingMiddlewareTest
     public void setup() throws IOException
     {
         httpCache = new HttpCache( Paths.get(testDir.newFolder().toURI()) );
-        holon = new HolonFactory().newHolon( config( map( home_dir, testDir.getRoot().getAbsolutePath() ) ), new Object[]{httpCache}, new Class[]{Endpoint.class} );
+        holon = new HolonFactory().newHolon( config( map(
+                        home_dir, testDir.getRoot().getAbsolutePath(),
+                        workers, "1") ),
+                new Object[]{httpCache}, new Class[]{Endpoint.class}, new Class[]{} );
         holon.start();
+        endpointCalled.set( 0 );
+    }
+
+    @After
+    public void tearDown()
+    {
+        holon.stop();
+        httpCache.stop();
     }
 
     @Test
@@ -123,5 +138,24 @@ public class CachingMiddlewareTest
         assertThat(endpointCalled.get(), equalTo( 2 ));
         assertThat(response.status(), equalTo(200));
         assertThat(response.contentAsString(), equalTo("Something else"));
+    }
+
+    @Test
+    public void shouldTrigger304OnMatchingEtag() throws Exception
+    {
+        // Given
+        HTTP.Response res = HTTP.GET( holon.httpUrl() + "/simple" );
+        String etag = res.header( ETAG );
+
+        // When
+        HTTP.Response resWithEtag = HTTP.withHeaders( IF_NONE_MATCH, etag ).GET( holon.httpUrl() + "/simple" );
+        HTTP.Response resWithOtherEtag = HTTP.withHeaders( IF_NONE_MATCH, "wrong-etag" ).GET( holon.httpUrl() + "/simple" );
+        HTTP.Response resWithNoEtag = HTTP.GET( holon.httpUrl() + "/simple" );
+
+        // Then
+        assertThat(resWithEtag.status(), equalTo(304));
+        assertThat(resWithEtag.contentAsString(), equalTo(""));
+        assertThat(resWithOtherEtag.status(), equalTo(200));
+        assertThat(resWithNoEtag.status(), equalTo(200));
     }
 }

@@ -19,14 +19,6 @@
  */
 package holon.util;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Scanner;
-
 import holon.api.exception.HolonException;
 import holon.api.http.Cookie;
 import holon.internal.http.common.StandardCookie;
@@ -48,8 +40,21 @@ import org.apache.http.entity.mime.content.StringBody;
 import org.apache.http.impl.client.BasicCookieStore;
 import org.apache.http.impl.client.HttpClients;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Scanner;
+
 public class HTTP
 {
+    public static HttpExchange withHeaders( String ... alternatingKeyValue )
+    {
+        return exchange().withHeaders( alternatingKeyValue );
+    }
+
     public static class Response
     {
         private final HttpResponse rawResponse;
@@ -76,6 +81,12 @@ public class HTTP
             return cookies;
         }
 
+        public String header(String name)
+        {
+            Header header = rawResponse.getLastHeader( name );
+            return header == null ? null : header.getValue();
+        }
+
         @Override
         public String toString()
         {
@@ -96,6 +107,10 @@ public class HTTP
 
         public String contentAsString()
         {
+            if(rawResponse.getEntity() == null)
+            {
+                return "";
+            }
             try(InputStream stream = rawResponse.getEntity().getContent())
             {
                 Scanner scanner = new Scanner( stream ).useDelimiter( "\\A" );
@@ -118,6 +133,7 @@ public class HTTP
     {
         private final BasicCookieStore cookieStore = new BasicCookieStore();
         private final HttpClientContext context = HttpClientContext.create();
+        private final Map<String, String> headers = new HashMap<>();
 
         private final HttpClient client = HttpClients.custom()
                 .setDefaultRequestConfig( RequestConfig.custom().setCookieSpec( CookieSpecs.BEST_MATCH).build() )
@@ -126,6 +142,15 @@ public class HTTP
         public HttpExchange()
         {
             context.setCookieStore(cookieStore);
+        }
+
+        public HttpExchange withHeaders(String ... alternatingKeyValue )
+        {
+            for ( int i = 0; i < alternatingKeyValue.length; i+=2 )
+            {
+                headers.put( alternatingKeyValue[i], alternatingKeyValue[i+1] );
+            }
+            return this;
         }
 
         public Response POST( String path, Payload payload )
@@ -144,6 +169,11 @@ public class HTTP
         {
             try
             {
+                for ( Map.Entry<String,String> header : headers.entrySet() )
+                {
+                    req.addHeader( header.getKey(), header.getValue() );
+                }
+
                 return new Response(client.execute(req, context), context);
             }
             catch ( IOException e )

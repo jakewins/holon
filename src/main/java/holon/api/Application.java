@@ -1,9 +1,9 @@
 package holon.api;
 
+import holon.api.config.Config;
+
 import java.util.Collection;
 import java.util.Collections;
-
-import holon.api.config.Config;
 
 /**
  * Application is an optional interface used to give {@link holon.Holon} control of your application life cycle.
@@ -24,6 +24,12 @@ public interface Application
      * Any object returned here will become available for dependency injection.
      */
     default Collection<Object> startup( Config config ) throws Exception { return Collections.emptyList(); };
+
+    /**
+     * List of middleware classes to apply to all endpoints. Note that this is separate from middleware applied
+     * with annotations, you do not need to list middleware applied with annotations here.
+     */
+    default Collection<Class<?>> middleware() throws Exception { return Collections.emptyList(); };
 
     /**
      * Called when the application is shut down and before it's restarted if auto-redeploy is enabled.

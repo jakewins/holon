@@ -3,6 +3,7 @@ package holon.internal.http.common;
 import holon.api.http.Content;
 import holon.api.http.Cookies;
 import holon.api.http.Request;
+import holon.api.http.RequestHeaders;
 import holon.api.http.Status;
 import holon.internal.io.ByteArrayOutput;
 import holon.internal.routing.path.PatternSegment;
@@ -185,6 +186,12 @@ public class StaticContentRouteTest
 
         @Override
         public Map<String, Object> formData()
+        {
+            return null;
+        }
+
+        @Override
+        public RequestHeaders headers()
         {
             return null;
         }

@@ -1,9 +1,12 @@
 package holon.util.io;
 
+import holon.util.scheduling.Scheduler;
+
 import java.io.IOException;
 import java.nio.file.FileSystem;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardWatchEventKinds;
@@ -13,8 +16,6 @@ import java.nio.file.WatchService;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashMap;
 import java.util.Map;
-
-import holon.util.scheduling.Scheduler;
 
 import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
 import static java.nio.file.StandardWatchEventKinds.ENTRY_DELETE;
@@ -111,29 +112,36 @@ public class FileSystemWatcher implements Scheduler.Job
 
     private void pollModifications() throws IOException
     {
-        Files.walkFileTree( basePath, new SimpleFileVisitor<Path>()
+        try
         {
-            @Override
-            public FileVisitResult visitFile( Path file, BasicFileAttributes attrs ) throws IOException
+            Files.walkFileTree( basePath, new SimpleFileVisitor<Path>()
             {
-                long time = attrs.lastModifiedTime().toMillis();
-                Long lastTime = modificationTimes.get( file );
-                if(lastTime == null)
+                @Override
+                public FileVisitResult visitFile( Path file, BasicFileAttributes attrs ) throws IOException
                 {
-                    // Don't trigger event, WatchService will have picked this up if it is a new file created
-                    modificationTimes.put( file, time );
-                }
-                else
-                {
-                    if(lastTime < time)
+                    long time = attrs.lastModifiedTime().toMillis();
+                    Long lastTime = modificationTimes.get( file );
+                    if ( lastTime == null )
                     {
+                        // Don't trigger event, WatchService will have picked this up if it is a new file created
                         modificationTimes.put( file, time );
-                        handler.onFileEvent( StandardWatchEventKinds.ENTRY_MODIFY, basePath.relativize( file ));
                     }
+                    else
+                    {
+                        if ( lastTime < time )
+                        {
+                            modificationTimes.put( file, time );
+                            handler.onFileEvent( StandardWatchEventKinds.ENTRY_MODIFY, basePath.relativize( file ) );
+                        }
+                    }
+                    return FileVisitResult.CONTINUE;
                 }
-                return FileVisitResult.CONTINUE;
-            }
-        });
+            } );
+        }
+        catch( NoSuchFileException e)
+        {
+            // ok
+        }
     }
 
     @Override

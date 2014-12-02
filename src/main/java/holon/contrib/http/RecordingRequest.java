@@ -19,21 +19,22 @@
  */
 package holon.contrib.http;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-
 import holon.api.http.Content;
 import holon.api.http.Cookie;
 import holon.api.http.Cookies;
 import holon.api.http.Output;
 import holon.api.http.Request;
+import holon.api.http.RequestHeaders;
 import holon.api.http.Status;
 import holon.internal.http.common.StandardCookie;
 import holon.internal.routing.path.Path;
 import holon.spi.RequestContext;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Wrap an existing request, but catch all response-related calls to it and allow those to be
@@ -139,6 +140,12 @@ public class RecordingRequest implements RequestContext
     {
         responseHeaders.put( header, value );
         return this;
+    }
+
+    @Override
+    public RequestHeaders headers()
+    {
+        return null;
     }
 
     public void replay( Output output ) throws IOException

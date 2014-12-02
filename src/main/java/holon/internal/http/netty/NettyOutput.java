@@ -62,6 +62,7 @@ public class NettyOutput implements Output
     public NettyOutput initialize( Channel channel )
     {
         this.channel = channel;
+        this.buffer = Unpooled.EMPTY_BUFFER;
         return this;
     }
 

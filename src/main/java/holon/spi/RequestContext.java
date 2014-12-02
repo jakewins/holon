@@ -1,11 +1,12 @@
 package holon.spi;
 
-import java.io.IOException;
-import java.util.Map;
-
 import holon.api.http.Cookies;
 import holon.api.http.Request;
+import holon.api.http.RequestHeaders;
 import holon.internal.routing.path.Path;
+
+import java.io.IOException;
+import java.util.Map;
 
 public interface RequestContext extends Request
 {
@@ -18,6 +19,10 @@ public interface RequestContext extends Request
     // Temporary
     @Deprecated
     Map<String, Object> formData() throws IOException;
+
+    // Temporary
+    @Deprecated
+    RequestHeaders headers();
 
     // Temporary
     @Deprecated

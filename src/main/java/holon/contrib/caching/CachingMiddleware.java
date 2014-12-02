@@ -19,12 +19,17 @@
  */
 package holon.contrib.caching;
 
-import java.io.IOException;
-
+import holon.api.http.Default;
+import holon.api.http.HeaderParam;
 import holon.api.http.PathParam;
 import holon.api.middleware.MiddlewareHandler;
 import holon.api.middleware.Pipeline;
 import holon.spi.RequestContext;
+
+import java.io.IOException;
+
+import static io.netty.handler.codec.http.HttpHeaders.Names.CACHE_CONTROL;
+import static io.netty.handler.codec.http.HttpHeaders.Names.IF_NONE_MATCH;
 
 public class CachingMiddleware
 {
@@ -38,9 +43,12 @@ public class CachingMiddleware
     }
 
     @MiddlewareHandler
-    public void handle(Pipeline pipeline, RequestContext req, @PathParam String path) throws IOException
+    public void handle(Pipeline pipeline, RequestContext req,
+            @HeaderParam(IF_NONE_MATCH) @Default("") String etag,
+            @HeaderParam(CACHE_CONTROL) @Default("") String cacheControl,
+            @PathParam String path) throws IOException
     {
-        cache.respond( req, key(path), pipeline );
+        cache.respond( req, key(path), etag, cacheControl.equalsIgnoreCase( "no-cache" ), pipeline );
     }
 
     private String key( String path )

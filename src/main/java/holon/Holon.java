@@ -15,8 +15,7 @@ import holon.spi.Route;
 import java.io.File;
 import java.net.MalformedURLException;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Collection;
 import java.util.Map;
 import java.util.function.Supplier;
 
@@ -24,9 +23,7 @@ import static holon.api.config.Setting.NO_DEFAULT;
 import static holon.api.config.Setting.defaultValue;
 import static holon.api.config.Setting.setting;
 import static holon.api.config.SettingConverters.bool;
-import static holon.api.config.SettingConverters.clazz;
 import static holon.api.config.SettingConverters.integer;
-import static holon.api.config.SettingConverters.listOf;
 import static holon.api.config.SettingConverters.mapOf;
 import static holon.api.config.SettingConverters.path;
 import static holon.api.config.SettingConverters.string;
@@ -46,11 +43,12 @@ public class Holon
         public static Setting<Path> home_dir =
                 setting( "application.home", path(), HolonFiles::defaultHome );
 
+        public static Setting<Integer> workers =
+                setting( "application.workers", integer(),
+                        defaultValue( ""+(Runtime.getRuntime().availableProcessors() * 4 )) );
+
         public static Setting<Map<String, String>> endpoint_packages =
                 setting( "application.endpoints", mapOf( string() ), HolonFiles::defaultEndpointPackages );
-
-        public static Setting<List<Class<?>>> middleware =
-                setting( "application.middleware", listOf( clazz() ), defaultValue( new ArrayList<>() ) );
 
         public static Setting<Path> template_path =
                 setting( "application.template_path", path(), HolonFiles::defaultTemplatePath );
@@ -78,13 +76,13 @@ public class Holon
         this.routes = routes;
     }
 
-    public static void run( Class<? extends Application> bootstrapClass )
+    public static void run( Class<? extends Application> applicationClass )
     {
         Config config = createConfiguration();
 
         if(config.get( Configuration.auto_redeploy ))
         {
-            new HolonRedeploy(bootstrapClass, config, new File( findHomeDirectory(), "src/main/java" ) )
+            new HolonRedeploy(applicationClass, config, new File( findHomeDirectory(), "src/main/java" ) )
                     .runWithAutoRecompile();
         }
         else
@@ -92,8 +90,9 @@ public class Holon
             Application application = null;
             try
             {
-                application = bootstrapClass.newInstance();
-                run( application.startup( config ).toArray() );
+                application = applicationClass.newInstance();
+                Collection<Object> injectables = application.startup( config );
+                run( config, injectables.toArray(), (Class[])application.middleware().toArray() );
             }
             catch ( Exception e )
             {
@@ -117,7 +116,12 @@ public class Holon
 
     public static void run( Config config, Object ... injectables )
     {
-        Holon holon = new HolonFactory().newHolon( config, injectables );
+        run(config, injectables, new Class[0]);
+    }
+
+    private static void run(Config config, Object[] injectables, Class[] globalMiddleware)
+    {
+        Holon holon = new HolonFactory().newHolon( config, injectables, globalMiddleware );
         holon.start();
         holon.join();
     }

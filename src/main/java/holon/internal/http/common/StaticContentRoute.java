@@ -1,19 +1,20 @@
 package holon.internal.http.common;
 
-import java.io.IOException;
-import java.nio.file.FileSystem;
-import java.nio.file.Files;
-import java.nio.file.Path;
-
 import holon.api.exception.HolonException;
-import holon.api.http.Content;
 import holon.api.http.Status;
+import holon.internal.http.common.files.FileContent;
 import holon.internal.http.common.files.FileRepository;
 import holon.spi.RequestContext;
 import holon.spi.Route;
 import holon.util.scheduling.Scheduler;
 
+import java.io.IOException;
+import java.nio.file.FileSystem;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 import static holon.internal.routing.HttpMethod.Standard.GET;
+import static io.netty.handler.codec.http.HttpHeaders.Names;
 
 public class StaticContentRoute implements Route
 {
@@ -75,10 +76,23 @@ public class StaticContentRoute implements Route
     @Override
     public void call( RequestContext req )
     {
-        Content file = files.get( req.path().fullPath() );
+        String etag = req.headers().getFirst( Names.IF_NONE_MATCH );
+        String cacheControl = req.headers().getFirst( Names.CACHE_CONTROL );
+        FileContent file = files.get( req.path().fullPath() );
         if(file != null)
         {
-            req.respond( Status.Code.OK, file );
+            if(etag != null
+               && (cacheControl == null || !cacheControl.equalsIgnoreCase( "no-cache" ))
+               && file.etag().equals(etag))
+            {
+                req.respond( Status.Code.NOT_MODIFIED );
+            }
+            else
+            {
+                req.addHeader( Names.ETAG, file.etag() );
+                req.addHeader( Names.CACHE_CONTROL, "public, max-age=86400" );
+                req.respond( Status.Code.OK, file );
+            }
         }
         else
         {

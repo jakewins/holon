@@ -8,6 +8,7 @@ public interface Status
     {
         OK( 200 ),
         SEE_OTHER( 303 ),
+        NOT_MODIFIED( 304 ),
         UNAUTHORIZED( 401 ),
         NOT_FOUND( 404 ),
         SERVER_ERROR( 500 );

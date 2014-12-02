@@ -23,6 +23,7 @@ import holon.api.http.Content;
 import holon.api.http.Cookie;
 import holon.api.http.Cookies;
 import holon.api.http.Request;
+import holon.api.http.RequestHeaders;
 import holon.api.http.Status;
 import holon.api.http.UploadedFile;
 import holon.internal.http.common.StandardCookie;
@@ -148,6 +149,12 @@ public class UndertowRequestContext implements RequestContext
     public Path path()
     {
         return path;
+    }
+
+    @Override
+    public RequestHeaders headers()
+    {
+        return null;           // TODO
     }
 
     @Override

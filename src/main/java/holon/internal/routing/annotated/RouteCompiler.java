@@ -1,13 +1,5 @@
 package holon.internal.routing.annotated;
 
-import java.lang.annotation.Annotation;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
-
 import holon.api.exception.HolonException;
 import holon.api.http.DELETE;
 import holon.api.http.GET;
@@ -24,6 +16,7 @@ import holon.internal.routing.HttpMethod;
 import holon.internal.routing.annotated.injection.ComponentInjectionStrategy;
 import holon.internal.routing.annotated.injection.CookieParamInjectionStrategy;
 import holon.internal.routing.annotated.injection.FormParamInjectionStrategy;
+import holon.internal.routing.annotated.injection.HeaderParamInjectionStrategy;
 import holon.internal.routing.annotated.injection.MiddlewareProvidedArgStrategy;
 import holon.internal.routing.annotated.injection.PathParamInjectionStrategy;
 import holon.internal.routing.annotated.injection.QueryParamInjectionStrategy;
@@ -32,6 +25,14 @@ import holon.internal.routing.basic.CallbackRoute;
 import holon.spi.RequestContext;
 import holon.spi.Route;
 import holon.util.collection.Pair;
+
+import java.lang.annotation.Annotation;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 import static holon.internal.routing.annotated.ArgInjectionStrategy.ArgumentInjector;
 import static holon.util.collection.ArrayTools.concat;
@@ -58,7 +59,8 @@ public class RouteCompiler
             new FormParamInjectionStrategy(),
             new PathParamInjectionStrategy(),
             new QueryParamInjectionStrategy(),
-            new CookieParamInjectionStrategy()
+            new CookieParamInjectionStrategy(),
+            new HeaderParamInjectionStrategy()
         };
     }
 
@@ -164,7 +166,7 @@ public class RouteCompiler
 
                 method.invoke( obj, args );
             }
-            catch ( IllegalAccessException | InvocationTargetException e )
+            catch ( IllegalArgumentException | IllegalAccessException | InvocationTargetException e )
             {
                 // To avoid huge exception chains caused by an exception thrown deep inside a route, where each
                 // wrapping middleware would add two exceptions, we unwrap exceptions here if possible.

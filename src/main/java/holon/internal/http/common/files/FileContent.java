@@ -1,12 +1,13 @@
 package holon.internal.http.common.files;
 
-import java.io.IOException;
-import java.nio.channels.FileChannel;
-import java.nio.file.Path;
-
 import holon.api.http.Content;
 import holon.api.http.Output;
 import holon.internal.io.ContentTypes;
+import holon.util.Digest;
+
+import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.file.Path;
 
 /**
  * Used by the file repository to transfer static files.
@@ -19,19 +20,22 @@ public class FileContent implements Content
     private final Path path;
     private final FileChannel channel;
     private final String type;
+    private final String etag;
 
-    public FileContent( Path path, FileChannel channel )
+    public FileContent( Path path, FileChannel channel ) throws IOException
     {
         this.path = path;
         this.channel = channel;
         this.type = determineType(path);
+        this.etag = channel == null ? Digest.md5( "" ) : Digest.md5( channel );
     }
 
-    public FileContent( FileChannel channel )
+    public FileContent( FileChannel channel ) throws IOException
     {
         this.channel = channel;
         this.type = "text/plain";
         this.path = null;
+        this.etag = channel == null ? Digest.md5( "" ) : Digest.md5( channel );
     }
 
     @Override
@@ -45,6 +49,11 @@ public class FileContent implements Content
     public String contentType( Object context )
     {
         return type;
+    }
+
+    public String etag()
+    {
+        return etag;
     }
 
     private String determineType( Path path )

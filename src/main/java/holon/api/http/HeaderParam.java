@@ -22,11 +22,8 @@ package holon.api.http;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
-/**
- * A parameter provided through HTTP query params - or a map of all query parameters if no parameter name is specified.
- */
-@Retention(RetentionPolicy.RUNTIME)
-public @interface QueryParam
+@Retention( RetentionPolicy.RUNTIME )
+public @interface HeaderParam
 {
     String value() default "";
 }

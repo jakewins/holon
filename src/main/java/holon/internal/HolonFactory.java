@@ -40,22 +40,23 @@ import java.util.List;
 import java.util.function.Supplier;
 
 import static holon.Holon.Configuration.endpoint_packages;
-import static holon.Holon.Configuration.middleware;
+import static java.util.Arrays.asList;
 
 public class HolonFactory
 {
     /** Create a Holon instance using routes discovered based on the configuration passed in. */
-    public Holon newHolon( Config config, Object[] injectables )
+    public Holon newHolon( Config config, Object[] injectables, Class[] globalMiddleware )
     {
         Components components = createInjectableComponents( config, injectables );
-        return newHolon( config, new PackageScanRouteDiscovery( components, config.get( endpoint_packages ), config.get( middleware )));
+        return newHolon( config, new PackageScanRouteDiscovery( components, config.get( endpoint_packages ),
+                asList(globalMiddleware)));
     }
 
     /** Create a Holon instance using routes from explicit endpoint classes. */
-    public Holon newHolon( Config config, Object[] injectables, Class[] endpointClasses )
+    public Holon newHolon( Config config, Object[] injectables, Class[] endpointClasses, Class[] globalMiddleware )
     {
         Components components = createInjectableComponents( config, injectables );
-        return newHolon( config, new ExplicitClassRouteDiscovery( "", components, endpointClasses, config.get( middleware )));
+        return newHolon( config, new ExplicitClassRouteDiscovery( "", components, endpointClasses, asList(globalMiddleware)));
     }
 
     /** Create a Holon instance using a custom route discovery strategy. */

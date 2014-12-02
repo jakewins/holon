@@ -19,24 +19,21 @@
  */
 package holon.util;
 
-import java.io.File;
-import java.io.IOException;
-
 import holon.Holon;
 import holon.api.config.Config;
 import holon.api.exception.HolonException;
 import holon.internal.HolonFactory;
-import holon.internal.config.ConfigBuilder;
 import holon.internal.config.MapConfig;
 import holon.util.io.FileTools;
 import org.junit.rules.ExternalResource;
 
+import java.io.File;
+import java.io.IOException;
+
 import static holon.Holon.Configuration.app_name;
 import static holon.Holon.Configuration.home_dir;
 import static holon.Holon.Configuration.http_port;
-import static holon.util.collection.ArrayTools.map;
 import static holon.util.io.Ports.findUnusedPort;
-import static java.util.Arrays.asList;
 import static junit.framework.TestCase.assertTrue;
 
 public class HolonRule extends ExternalResource
@@ -44,6 +41,7 @@ public class HolonRule extends ExternalResource
     private final Class<?>[] endpoints;
     private final Object[] injectables;
     private final Config config;
+    private final Class<?>[] middleware;
 
     private Holon holon;
     private File home;
@@ -55,15 +53,20 @@ public class HolonRule extends ExternalResource
 
     public HolonRule( Class<?>[] endpointClasses, Class<?>[] middleware )
     {
-        this(endpointClasses, new Object[]{}, new ConfigBuilder()
-                .set( Holon.Configuration.middleware, map( asList( middleware ), Class::getName )).build());
+        this( endpointClasses, new Object[]{}, new MapConfig(), middleware );
     }
 
     public HolonRule( Class<?>[] endpointClasses, Object[] injectables, Config config )
     {
+        this(endpointClasses, injectables, config, new Class[0]);
+    }
+
+    public HolonRule( Class<?>[] endpointClasses, Object[] injectables, Config config, Class<?>[] middleware )
+    {
         this.endpoints = endpointClasses;
         this.injectables = injectables;
         this.config = config;
+        this.middleware = middleware;
     }
 
     @Override
@@ -75,7 +78,7 @@ public class HolonRule extends ExternalResource
         this.config.set( app_name,  "testapp" );
         this.config.set( home_dir,  home.getAbsolutePath() );
 
-        holon = new HolonFactory().newHolon( config, injectables, endpoints );
+        holon = new HolonFactory().newHolon( config, injectables, endpoints, middleware );
         holon.start();
     }
 

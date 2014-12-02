@@ -1,5 +1,10 @@
 package holon.internal.http.common.files;
 
+import holon.api.exception.HolonException;
+import holon.util.collection.LRUMap;
+import holon.util.io.FileSystemWatcher;
+import holon.util.scheduling.Scheduler;
+
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.file.FileSystem;
@@ -7,12 +12,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.WatchEvent;
-
-import holon.api.exception.HolonException;
-import holon.api.http.Content;
-import holon.util.collection.LRUMap;
-import holon.util.io.FileSystemWatcher;
-import holon.util.scheduling.Scheduler;
 
 /**
  * Keeps a fixed amount of file handles open - files will be removed from the repo according to an LRU strategy, or
@@ -61,7 +60,7 @@ public class FileRepository implements FileSystemWatcher.FSEventHandler
         }
     }
 
-    public Content get( String path )
+    public FileContent get( String path )
     {
         if(filesHaveChangedOnDisk)
         {

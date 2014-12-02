@@ -20,12 +20,11 @@
 package holon.internal.routing.annotated.injection;
 
 import holon.api.exception.HolonException;
-import holon.api.http.Cookie;
-import holon.api.http.CookieParam;
-import holon.api.http.Cookies;
 import holon.api.http.Default;
+import holon.api.http.HeaderParam;
+import holon.api.http.RequestHeaders;
+import holon.api.http.UploadedFile;
 import holon.api.middleware.Pipeline;
-import holon.internal.http.common.StandardCookie;
 import holon.internal.routing.annotated.ArgInjectionStrategy;
 import holon.spi.RequestContext;
 
@@ -34,12 +33,12 @@ import java.lang.annotation.Annotation;
 
 import static holon.internal.routing.annotated.AnnotationExtractor.findAnnotation;
 
-public class CookieParamInjectionStrategy implements ArgInjectionStrategy
+public class HeaderParamInjectionStrategy implements ArgInjectionStrategy
 {
     @Override
     public boolean appliesTo( Class<?> type, Annotation[] annotations )
     {
-        return findAnnotation( CookieParam.class, annotations ) != null;
+        return findAnnotation( HeaderParam.class, annotations ) != null;
     }
 
     @Override
@@ -47,51 +46,51 @@ public class CookieParamInjectionStrategy implements ArgInjectionStrategy
     {
         // First, check if the annotation specifies a specific attribute to use, and if it does, set things up
         // to inject the value of that attribute directly
-        final CookieParam paramAnnotation = findAnnotation( CookieParam.class, annotations );
+        final HeaderParam paramAnnotation = findAnnotation( HeaderParam.class, annotations );
         final Default defaultAnnotation = findAnnotation( Default.class, annotations );
 
-        final String name = paramAnnotation.value();
-        final Cookie defaultValue = defaultAnnotation == null ? null : new StandardCookie( name,
-                defaultAnnotation.value());
+        final String attribute = paramAnnotation.value();
+        final String defaultValue = defaultAnnotation == null ? null : defaultAnnotation.value();
 
-        if(!name.equals( "" ))
+        if(!attribute.equals( "" ))
         {
-            if(type == Cookie.class)
+            if(type == String.class || type == UploadedFile.class)
             {
-                return new ArgumentInjector(position)
+                return new ArgInjectionStrategy.ArgumentInjector(position)
                 {
                     @Override
                     public Object generateArgument( RequestContext ctx, Pipeline pipeline ) throws IOException
                     {
-                        Cookie o = ctx.cookies().get( name );
+                        Object o = ctx.headers().getFirst( attribute );
                         if(o == null)
                         {
                             if(defaultValue != null)
                             {
                                 return defaultValue;
                             }
-                            throw new HolonException( "Missing required cookie '" + name + "'" );
+                            throw new HolonException( "Missing required header '" + attribute + "'" );
                         }
                         return o;
                     }
                 };
             }
 
-            throw new IllegalArgumentException( "Cookie attribute needs to be a Cookie, but was " + type + "." );
+            throw new IllegalArgumentException( "HeaderParam attribute needs to be a string, but was " + type + "." );
         }
 
         // If a specific attribute was not asked for, the user should get the full attribute map
-        if(type != Cookies.class)
+        if(type != RequestHeaders.class)
         {
-            throw new IllegalArgumentException( "CookieParam attribute needs to be Cookies, but was " + type + "." );
+            throw new IllegalArgumentException( "HeaderParam attribute needs to be a RequestHeaders argument, " +
+                                                "but was " + type + "." );
         }
 
-        return new ArgumentInjector(position)
+        return new ArgInjectionStrategy.ArgumentInjector(position)
         {
             @Override
             public Object generateArgument( RequestContext ctx, Pipeline pipeline ) throws IOException
             {
-                return ctx.cookies();
+                return ctx.headers();
             }
         };
     }

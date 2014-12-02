@@ -11,5 +11,4 @@ import java.lang.annotation.RetentionPolicy;
 public @interface FormParam
 {
     String value() default "";
-    String defaultVal() default "";
 }

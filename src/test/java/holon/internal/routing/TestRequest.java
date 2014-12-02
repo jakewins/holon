@@ -3,6 +3,7 @@ package holon.internal.routing;
 import holon.api.http.Content;
 import holon.api.http.Cookies;
 import holon.api.http.Request;
+import holon.api.http.RequestHeaders;
 import holon.api.http.Status;
 import holon.internal.routing.path.Path;
 import holon.internal.routing.path.PatternSegment;
@@ -81,6 +82,12 @@ public class TestRequest implements RequestContext
     public Map<String, Object> formData()
     {
         return postData;
+    }
+
+    @Override
+    public RequestHeaders headers()
+    {
+        return null;
     }
 
     @Override

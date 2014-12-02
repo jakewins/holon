@@ -19,10 +19,6 @@
  */
 package holon.internal.redeploy;
 
-import java.io.File;
-import java.nio.file.FileSystem;
-import java.nio.file.FileSystems;
-
 import holon.Holon;
 import holon.api.Application;
 import holon.api.config.Config;
@@ -30,6 +26,11 @@ import holon.internal.HolonFactory;
 import holon.internal.redeploy.compile.RuntimeCompiler;
 import holon.util.io.FileSystemWatcher;
 import holon.util.scheduling.StandardScheduler;
+
+import java.io.File;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
+import java.util.Collection;
 
 import static holon.util.io.FileTools.findFiles;
 
@@ -135,7 +136,11 @@ public class HolonRedeploy
         Class<? extends Application> aClass = (Class<? extends Application>)
                 classLoader.loadClass( bootstrapClass.getCanonicalName() );
         application = aClass.newInstance();
-        holon = new HolonFactory().newHolon( config, application.startup( config ).toArray() );
+        Collection<Object> injectables = application.startup( config );
+        holon = new HolonFactory().newHolon(
+                config,
+                injectables.toArray(),
+                (Class[])application.middleware().toArray() );
         try
         {
             holon.start();

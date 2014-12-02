@@ -17,16 +17,21 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package holon.api.http;
+package holon.internal.routing.annotated;
 
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Annotation;
 
-/**
- * A parameter provided through HTTP query params - or a map of all query parameters if no parameter name is specified.
- */
-@Retention(RetentionPolicy.RUNTIME)
-public @interface QueryParam
+public class AnnotationExtractor
 {
-    String value() default "";
+    public static <T> T findAnnotation(Class<T> cls, Annotation[] annotations)
+    {
+        for ( Annotation annotation : annotations )
+        {
+            if(cls.isInstance( annotation ))
+            {
+                return cls.cast( annotation );
+            }
+        }
+        return null;
+    }
 }

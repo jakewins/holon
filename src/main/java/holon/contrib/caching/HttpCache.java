@@ -19,29 +19,26 @@
  */
 package holon.contrib.caching;
 
-import holon.api.http.Content;
 import holon.api.http.Status;
 import holon.api.middleware.Pipeline;
-import holon.contrib.http.NoContent;
 import holon.contrib.http.RecordingRequest;
-import holon.internal.http.common.files.FileContent;
 import holon.internal.io.FileOutput;
 import holon.spi.RequestContext;
 
 import java.io.IOException;
-import java.lang.ref.WeakReference;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
-import static java.nio.file.StandardOpenOption.CREATE_NEW;
+import static io.netty.handler.codec.http.HttpHeaders.Names;
+import static java.nio.file.StandardOpenOption.CREATE;
 import static java.nio.file.StandardOpenOption.READ;
 import static java.nio.file.StandardOpenOption.WRITE;
 
@@ -49,96 +46,34 @@ import static java.nio.file.StandardOpenOption.WRITE;
  * An initial iteration on a basic http cache. This cache depends on the OS file cache to keep relevant
  * entries in RAM. It uses per-thread local caches to avoid coordination, but allows globally evicting cached
  * entries by their cache keys.
+ *
+ * We currently dont have a bounds for how large the cache can be (need to implement something like LRU-K) and we
+ * dont handle query parameters or other mechanism to have more complex cache keys.
+ *
+ * Also, now that we've swapped back to netty, this could be modified to cache the full chunked and gzipped response,
+ * simply delegating to the OS's transferTo.
  */
 public class HttpCache
 {
-    public static class CacheEntry
-    {
-        private Status status;
-        private Map<String, String> headers;
-        private Content content;
-
-        private FileChannel channel;
-        private final Path cacheFilePath;
-        private volatile boolean evicted;
-        public int count = 0;
-
-        public CacheEntry( Status status, Map<String,String> headers, FileChannel channel, Path cacheFilePath )
-        {
-            this.status = status;
-            this.headers = headers;
-            this.channel = channel;
-            this.cacheFilePath = cacheFilePath;
-            this.content = channel == null ? new NoContent() : new FileContent( channel );
-        }
-
-        public synchronized void respondTo( RequestContext req )
-        {
-            for ( Map.Entry<String, String> header : headers.entrySet() )
-            {
-                req.addHeader( header.getKey(), header.getValue() );
-            }
-
-            req.respond( status, content );
-        }
-
-        @Override
-        protected void finalize() throws Throwable
-        {
-            super.finalize();
-            evict();
-        }
-
-        public boolean isEvicted()
-        {
-            return evicted;
-        }
-
-        public void requestEviction()
-        {
-            evicted = true;
-        }
-
-        public void evict() throws IOException
-        {
-            evicted = true;
-            if(channel != null)
-            {
-                channel.close();
-                cacheFilePath.toFile().delete();
-                channel = null;
-            }
-        }
-    }
-
     private final Path cacheDir;
 
     /**
-     * This is a bit complex.
-     *
-     * This cache has two competing objectives:
-     *   1) We do not want coordination on the hot path and;
-     *   2) We want to be able to globally evict arbitrary entries
-     *
-     * The way we achieve this is by having each thread run it's own cache map, but we retain a reference to all thread-local
-     * maps in a global set (globalCacheReferences, below). This way, during regular operation each thread manages its
-     * own caching. However, we can access these thread-local caches via the global set, and that way we can evict things.
-     *
-     * We use weak references below because threads may die, and we want the GC to clean up our mess if that happens.
+     * Global cache entries. If there is a cache miss on the local level, the handler will check here before trying to
+     * actually invoke the endpoint.
      */
-    private final Set<WeakReference<Map<String, CacheEntry>>> globalCacheReferences = Collections.newSetFromMap(new ConcurrentHashMap<>() );
+    private final ConcurrentMap<String, GlobalCacheEntry> globalEntriesByPath = new ConcurrentHashMap<>();
+
+    private final ConcurrentMap<String, GlobalCacheEntry> globalEntriesByKey = new ConcurrentHashMap<>();
 
     /**
      * This is the thread local map.
      */
-    private final ThreadLocal<Map<String, CacheEntry>> caches = new ThreadLocal<Map<String,CacheEntry>>()
+    private final ThreadLocal<Map<String,LocalCacheEntry>> caches = new ThreadLocal<Map<String,LocalCacheEntry>>()
     {
         @Override
-        protected Map<String,CacheEntry> initialValue()
+        protected Map<String,LocalCacheEntry> initialValue()
         {
-            HashMap<String, CacheEntry> cache = new HashMap<>();
-            globalCacheReferences.add( new WeakReference<>(cache) );
-            return cache;
+            return new HashMap<>();
         }
     };
 
@@ -153,79 +88,172 @@ public class HttpCache
 
     public void evict( String cacheKey )
     {
-        Iterator<WeakReference<Map<String, CacheEntry>>> iterator = globalCacheReferences.iterator();
-        while(iterator.hasNext())
+        GlobalCacheEntry global = globalEntriesByKey.remove( cacheKey );
+        if(global == null)
         {
-            Map<String, CacheEntry> cache = iterator.next().get();
-            if(cache == null)
-            {
-                iterator.remove();
-                continue;
-            }
+            return;
+        }
+        globalEntriesByPath.remove( global.path() );
+        global.requestEviction();
+    }
 
-            CacheEntry entry = cache.get( cacheKey );
-            if(entry != null)
-            {
-                entry.requestEviction();
-            }
+    public void respond( RequestContext req, String cacheKey, String etag, boolean browserCacheBypass,
+            Pipeline pipeline ) throws
+            IOException
+    {
+        String cachePath = cachePath(req);
+
+        Map<String,LocalCacheEntry> cache = caches.get();
+        LocalCacheEntry cacheEntry = cache.get( cachePath );
+        if ( cacheEntry == null || cacheEntry.isEvicted() )
+        {
+            cacheEntry = cacheMiss( req, cachePath, cacheKey, pipeline, cache );
+        }
+
+        if( cacheEntry.etagEquals( etag ) && !browserCacheBypass)
+        {
+            req.respond( Status.Code.NOT_MODIFIED );
+        }
+        else
+        {
+            cacheEntry.respondTo( req );
         }
     }
 
-    public void respond( RequestContext req, String cacheKey, Pipeline pipeline ) throws IOException
+    private LocalCacheEntry cacheMiss( RequestContext req, String cachePath, String cacheKey, Pipeline pipeline,
+            Map<String,LocalCacheEntry> cache ) throws IOException
     {
-        Map<String, CacheEntry> cache = caches.get();
-        CacheEntry cacheEntry = cache.get( cacheKey );
-        if ( cacheEntry == null || cacheEntry.isEvicted() )
+        GlobalCacheEntry global = getFromGlobalCache( req, cachePath, cacheKey, pipeline );
+
+        if(!global.awaitLoaded())
         {
-            // We won, now we need to populate the cache entry
+            return cacheMiss( req, cachePath, cacheKey, pipeline, cache );
+        }
+
+        LocalCacheEntry cacheEntry = new LocalCacheEntry( global );
+
+        if(!global.register( cacheEntry ))
+        {
+            return cacheMiss( req, cachePath, cacheKey, pipeline, cache );
+        }
+        cache.put( cachePath, cacheEntry );
+        return cacheEntry;
+    }
+
+    private GlobalCacheEntry getFromGlobalCache( RequestContext req, String cachePath, String cacheKey,
+            Pipeline pipeline )
+            throws IOException
+    {
+        GlobalCacheEntry global = globalEntriesByPath.get( cachePath );
+        if(global == null)
+        {
+            global = new GlobalCacheEntry();
+            GlobalCacheEntry previous = globalEntriesByPath.putIfAbsent( cachePath, global );
+            if ( previous != null )
+            {
+                global = previous;
+            }
+            else
+            {
+                globalEntriesByKey.put( cacheKey, global );
+                populateGlobalEntry( req, cachePath, cacheKey, pipeline, global );
+            }
+        }
+        return global;
+    }
+
+    private void populateGlobalEntry( RequestContext req, String cachePath, String cacheKey, Pipeline pipeline,
+            GlobalCacheEntry global )
+            throws IOException
+    {
+        // We've won a race to populate the global cache
+        boolean success = false;
+        try
+        {
             RecordingRequest recorder = new RecordingRequest( req );
             pipeline.call( recorder );
 
-            FileChannel ch = null;
-            Path cacheFilePath = newCachedFile();
+            Path cacheFilePath = null;
             if ( recorder.hasContent() )
             {
-                ch = FileChannel.open( cacheFilePath, CREATE_NEW, WRITE, READ );
-                recorder.replay( new FileOutput( ch ) );
-                ch.force( true );
+                cacheFilePath = newCachedFile();
+                try(FileChannel ch = FileChannel.open( cacheFilePath, CREATE, WRITE, READ ))
+                {
+                    recorder.replay( new FileOutput( ch ) );
+                    ch.force( true );
+                }
             }
 
-            cacheEntry = new CacheEntry( recorder.recordedStatus(), recorder.recordedHeaders(), ch, cacheFilePath );
-            cache.put( cacheKey, cacheEntry );
+            global.populate(
+                    cachePath,
+                    recorder.recordedStatus(),
+                    stripPrivateHeaders( recorder.recordedHeaders() ),
+                    cacheFilePath );
+            success = true;
         }
-
-        cacheEntry.respondTo( req );
+        finally
+        {
+            if(!success)
+            {
+                global.requestEviction();
+                globalEntriesByKey.remove( cacheKey );
+                globalEntriesByPath.remove( cachePath );
+            }
+            else
+            {
+                global.markAsLoaded();
+            }
+        }
     }
 
     public void stop()
     {
-        Iterator<WeakReference<Map<String, CacheEntry>>> iterator = globalCacheReferences.iterator();
-        while(iterator.hasNext())
+        for ( GlobalCacheEntry entry : globalEntriesByKey.values() )
         {
-            Map<String, CacheEntry> cache = iterator.next().get();
-            if(cache == null)
+            try
             {
-                iterator.remove();
-                continue;
+                entry.evict();
             }
-
-            for ( CacheEntry cacheEntry : cache.values() )
+            catch ( IOException e )
             {
-                try
-                {
-                    cacheEntry.evict();
-                }
-                catch ( IOException e )
-                {
-                    // TODO: Log a warning
-                }
+                e.printStackTrace(); // TODO
             }
         }
     }
 
     private Path newCachedFile() throws IOException
     {
-        String name = UUID.randomUUID().toString();
-        return cacheDir.resolve( name );
+        return cacheDir.resolve( UUID.randomUUID().toString() );
+    }
+
+    private static final Set<String> headerWhitelist = new HashSet<>();
+
+    {{
+        headerWhitelist.add( Names.CONTENT_BASE.toLowerCase() );
+        headerWhitelist.add( Names.CONTENT_ENCODING.toLowerCase() );
+        headerWhitelist.add( Names.CONTENT_LANGUAGE.toLowerCase() );
+        headerWhitelist.add( Names.CONTENT_LENGTH.toLowerCase() );
+        headerWhitelist.add( Names.CONTENT_LOCATION.toLowerCase() );
+        headerWhitelist.add( Names.CONTENT_TRANSFER_ENCODING.toLowerCase() );
+        headerWhitelist.add( Names.CONTENT_MD5.toLowerCase() );
+        headerWhitelist.add( Names.CONTENT_RANGE.toLowerCase() );
+        headerWhitelist.add( Names.CONTENT_TYPE.toLowerCase() );
+        headerWhitelist.add( Names.LOCATION.toLowerCase() );
+        headerWhitelist.add( Names.SERVER.toLowerCase() );
+        headerWhitelist.add( Names.TRANSFER_ENCODING.toLowerCase() );
+    }}
+
+    private Map<String, String> stripPrivateHeaders( Map<String,String> original )
+    {
+        Map<String, String> cachedHeaders = new HashMap<>();
+        original.entrySet().stream()
+            .filter( entry -> headerWhitelist.contains( entry.getKey().toLowerCase() ) )
+            .forEach( entry -> cachedHeaders.put( entry.getKey(), entry.getValue() ) );
+        return cachedHeaders;
+    }
+
+    private final String cachePath(RequestContext req)
+    {
+        return req.path().fullPath();
     }
 }

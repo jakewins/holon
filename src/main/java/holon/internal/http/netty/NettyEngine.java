@@ -48,6 +48,7 @@ public class NettyEngine implements HolonEngine
 {
     private final Logging.Logger logger;
     private final int httpPort;
+    private final int workers;
 
     private volatile boolean running = false;
     private ExecutorService executor;
@@ -58,6 +59,7 @@ public class NettyEngine implements HolonEngine
     public NettyEngine( Config config, Logging.Logger logger )
     {
         this.logger = logger;
+        this.workers = config.get(Holon.Configuration.workers);
         this.httpPort = config.get( Holon.Configuration.http_port );
     }
 
@@ -68,7 +70,7 @@ public class NettyEngine implements HolonEngine
         executor = Executors.newCachedThreadPool();
 
         disruptor = new Disruptor<>( NettyWorkEvent::new, 1024, executor );
-        disruptor.handleEventsWithWorkerPool( createWorkers( 4, routes ) );
+        disruptor.handleEventsWithWorkerPool( createWorkers( workers, routes ) );
         disruptor.start();
 
         RingBuffer<NettyWorkEvent> ringBuffer = disruptor.getRingBuffer();
