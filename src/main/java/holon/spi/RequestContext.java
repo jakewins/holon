@@ -6,6 +6,7 @@ import holon.api.http.RequestHeaders;
 import holon.internal.routing.path.Path;
 
 import java.io.IOException;
+import java.net.SocketAddress;
 import java.util.Map;
 
 public interface RequestContext extends Request
@@ -31,4 +32,8 @@ public interface RequestContext extends Request
     // Temporary
     @Deprecated
     Map<String, Iterable<String>> queryParams();
+
+    // Temporary
+    @Deprecated
+    default SocketAddress remoteAddress() { return null; }
 }

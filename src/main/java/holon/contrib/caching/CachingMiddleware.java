@@ -19,6 +19,7 @@
  */
 package holon.contrib.caching;
 
+import holon.api.config.Config;
 import holon.api.http.Default;
 import holon.api.http.HeaderParam;
 import holon.api.http.PathParam;
@@ -35,11 +36,13 @@ public class CachingMiddleware
 {
     private final HttpCache cache;
     private final String cacheKey;
+    private final boolean enabled;
 
-    public CachingMiddleware( Cached annotation, HttpCache cache)
+    public CachingMiddleware( Cached annotation, HttpCache cache, Config config )
     {
         this.cache = cache;
         this.cacheKey = annotation.cacheKey();
+        this.enabled = config.get( HttpCache.Configuration.cache_enabled );
     }
 
     @MiddlewareHandler
@@ -48,7 +51,14 @@ public class CachingMiddleware
             @HeaderParam(CACHE_CONTROL) @Default("") String cacheControl,
             @PathParam String path) throws IOException
     {
-        cache.respond( req, key(path), etag, cacheControl.equalsIgnoreCase( "no-cache" ), pipeline );
+        if(enabled)
+        {
+            cache.respond( req, key( path ), etag, cacheControl.equalsIgnoreCase( "no-cache" ), pipeline );
+        }
+        else
+        {
+            pipeline.call();
+        }
     }
 
     private String key( String path )

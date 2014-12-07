@@ -44,6 +44,7 @@ import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.ServerCookieEncoder;
 
 import java.io.IOException;
+import java.net.SocketAddress;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -171,6 +172,12 @@ public class NettyRequestContext implements RequestContext
         response.headers().set( CONTENT_LENGTH, buffer.readableBytes() );
 
         channel.writeAndFlush( response );
+    }
+
+    @Override
+    public SocketAddress remoteAddress()
+    {
+        return channel.remoteAddress();
     }
 
     private ByteBuf renderContent( Content content, Object context )

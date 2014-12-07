@@ -75,6 +75,14 @@ public class CachingMiddlewareTest
             endpointCalled.incrementAndGet();
             req.respond( Status.Code.OK, new StringContent(simpleContent.get()) );
         }
+
+        @GET("/explicit")
+        @Cached(time=100, cacheKey = "explicit-key")
+        public void explicit( Request req )
+        {
+            endpointCalled.incrementAndGet();
+            req.respond( Status.Code.OK );
+        }
     }
 
     @Before
@@ -138,6 +146,22 @@ public class CachingMiddlewareTest
         assertThat(endpointCalled.get(), equalTo( 2 ));
         assertThat(response.status(), equalTo(200));
         assertThat(response.contentAsString(), equalTo("Something else"));
+    }
+
+    @Test
+    public void shouldEvictEndpointsWithExplicitKeys() throws Exception
+    {
+        // Given
+        HTTP.GET( holon.httpUrl() + "/explicit" );
+
+        httpCache.evict( "explicit-key" );
+
+        // When
+        HTTP.Response response = HTTP.GET( holon.httpUrl() + "/explicit" );
+
+        // Then
+        assertThat(endpointCalled.get(), equalTo( 2 ));
+        assertThat(response.status(), equalTo(200));
     }
 
     @Test

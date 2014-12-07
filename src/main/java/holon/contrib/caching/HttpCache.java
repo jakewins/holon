@@ -19,6 +19,7 @@
  */
 package holon.contrib.caching;
 
+import holon.api.config.Setting;
 import holon.api.http.Status;
 import holon.api.middleware.Pipeline;
 import holon.contrib.http.RecordingRequest;
@@ -37,6 +38,9 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import static holon.api.config.Setting.defaultValue;
+import static holon.api.config.Setting.setting;
+import static holon.api.config.SettingConverters.bool;
 import static io.netty.handler.codec.http.HttpHeaders.Names;
 import static java.nio.file.StandardOpenOption.CREATE;
 import static java.nio.file.StandardOpenOption.READ;
@@ -55,6 +59,12 @@ import static java.nio.file.StandardOpenOption.WRITE;
  */
 public class HttpCache
 {
+    public static class Configuration
+    {
+        public static final Setting<Boolean> cache_enabled = setting( "application.cache.enabled", bool(),
+                defaultValue( "true" ) );
+    }
+
     private final Path cacheDir;
 
     /**

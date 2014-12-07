@@ -24,6 +24,7 @@ import com.lmax.disruptor.WorkHandler;
 import com.lmax.disruptor.dsl.Disruptor;
 import holon.Holon;
 import holon.api.config.Config;
+import holon.api.exception.HolonException;
 import holon.api.logging.Logging;
 import holon.internal.http.netty.work.NettyWorkEvent;
 import holon.internal.http.netty.work.NettyWorkHandler;
@@ -42,6 +43,7 @@ import io.netty.handler.codec.http.HttpResponseEncoder;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 public class NettyEngine implements HolonEngine
@@ -83,7 +85,14 @@ public class NettyEngine implements HolonEngine
         b.channel( NioServerSocketChannel.class );
         b.childHandler(new Initializer(ringBuffer));
 
-        b.bind(httpPort);
+        try
+        {
+            b.bind(httpPort).sync();
+        }
+        catch ( InterruptedException e )
+        {
+            throw new HolonException( "Failed to bind to '"+httpPort+"', " + e.getMessage());
+        }
 
     }
 
@@ -102,6 +111,14 @@ public class NettyEngine implements HolonEngine
     {
         bossGroup.shutdownGracefully();
         workerGroup.shutdownGracefully();
+        try
+        {
+            bossGroup.awaitTermination( 5, TimeUnit.SECONDS );
+        }
+        catch ( InterruptedException e )
+        {
+            // swallow
+        }
         if(disruptor != null)
         {
             disruptor.shutdown();
